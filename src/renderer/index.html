@@ -1,0 +1,804 @@
+<!doctype html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PortNest</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --window: #1c1c1e;
+      --panel: #1a1a1c;
+      --text: #ffffff;
+      --muted: rgba(255,255,255,.5);
+      --faint: rgba(255,255,255,.3);
+      --line: rgba(255,255,255,.08);
+      --blue: #2563eb;
+      --green: #22c55e;
+      --red: #ef4444;
+      --mono: ui-monospace, "SF Mono", Menlo, Monaco, Consolas, monospace;
+      --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html, body { width: 100%; min-height: 100%; margin: 0; }
+    body {
+      min-height: 100vh;
+      background: #171717;
+      color: var(--text);
+      font-family: var(--sans);
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+      user-select: none;
+    }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(circle at 20% 0%, rgba(49,46,129,.2), transparent 34%),
+        radial-gradient(circle at 82% 18%, rgba(88,28,135,.18), transparent 38%),
+        linear-gradient(135deg, rgba(49,46,129,.12), rgba(0,0,0,.4));
+      pointer-events: none;
+    }
+    button { font: inherit; }
+    .app-shell {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(28,28,30,.9);
+      border: 1px solid rgba(255,255,255,.1);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .titlebar {
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      -webkit-app-region: drag;
+      flex: 0 0 auto;
+    }
+    .window-control-space { width: 64px; flex: 0 0 64px; }
+    .app-title { font-size: 14px; font-weight: 500; color: rgba(255,255,255,.8); }
+    .title-spacer { width: 64px; }
+    .update {
+      margin: 0 16px 16px;
+      background: rgba(59,130,246,.15);
+      border: 1px solid rgba(59,130,246,.2);
+      border-radius: 8px;
+      padding: 12px;
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      animation: fadeIn .22s ease-out;
+    }
+    .update.show { display: flex; }
+    .update-title { color: #60a5fa; font-size: 12px; font-weight: 600; }
+    .update-sub { color: rgba(255,255,255,.8); font-size: 11px; margin-top: 2px; }
+    .update button {
+      border: 0;
+      border-radius: 6px;
+      background: #2563eb;
+      color: #fff;
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .content {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+      padding: 0 16px 24px;
+    }
+    .stack { display: grid; gap: 24px; }
+    .status-head {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-top: 8px;
+      text-align: center;
+    }
+    .pulse-wrap {
+      position: relative;
+      width: 64px;
+      height: 64px;
+      border-radius: 999px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 12px;
+      transition: background .5s ease;
+    }
+    .pulse-wrap.running { background: rgba(34,197,94,.1); }
+    .pulse-wrap.stopped { background: rgba(239,68,68,.1); }
+    .ping {
+      position: absolute;
+      inset: 0;
+      border-radius: 999px;
+      background: var(--green);
+      opacity: .2;
+      animation: ping 1.5s cubic-bezier(0,0,.2,1) infinite;
+    }
+    .pulse-dot {
+      width: 16px;
+      height: 16px;
+      border-radius: 999px;
+      background: var(--green);
+      box-shadow: 0 0 15px rgba(34,197,94,.5);
+    }
+    .pulse-wrap.stopped .ping { display: none; }
+    .pulse-wrap.stopped .pulse-dot { background: var(--red); box-shadow: 0 0 15px rgba(239,68,68,.5); }
+    .state-title { margin: 0; font-size: 20px; line-height: 1.25; font-weight: 600; }
+    .state-sub { margin: 6px 0 0; font-size: 12px; color: rgba(255,255,255,.5); font-weight: 500; }
+    .card {
+      position: relative;
+      border-radius: 16px;
+      background: rgba(255,255,255,.03);
+      border: 1px solid rgba(255,255,255,.08);
+      overflow: hidden;
+    }
+    .code-card { padding: 20px; }
+    .code-card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to bottom, rgba(255,255,255,.04), transparent);
+      pointer-events: none;
+    }
+    .card-row {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .card-label { font-size: 14px; font-weight: 600; color: rgba(255,255,255,.7); }
+    .number {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      justify-content: center;
+      margin: 16px 0;
+      font: 700 42px/1 var(--mono);
+      letter-spacing: .2em;
+      color: #fff;
+      text-shadow: 0 2px 8px rgba(0,0,0,.35);
+      white-space: pre;
+      user-select: text;
+    }
+    .number.empty { color: rgba(255,255,255,.26); letter-spacing: .12em; }
+    .caption {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      font-size: 11px;
+      color: rgba(255,255,255,.4);
+      margin-bottom: 20px;
+    }
+    .primary-btn {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      min-height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      background: #2563eb;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .2s ease, border-color .2s ease, color .2s ease;
+      box-shadow: 0 10px 24px rgba(30,58,138,.2);
+    }
+    .primary-btn:hover { background: #3b82f6; }
+    .primary-btn.copied {
+      background: rgba(34,197,94,.2);
+      color: #4ade80;
+      border-color: rgba(34,197,94,.3);
+      box-shadow: none;
+    }
+    .primary-btn:disabled { cursor: not-allowed; background: rgba(255,255,255,.08); color: rgba(255,255,255,.35); box-shadow: none; }
+    .mini-note { position: relative; z-index: 1; text-align: center; color: rgba(255,255,255,.3); font-size: 10px; margin-top: 12px; }
+    .notice {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 14px;
+      background: rgba(0,0,0,.2);
+      border: 1px solid rgba(255,255,255,.05);
+      border-radius: 12px;
+    }
+    .notice svg { width: 20px; height: 20px; color: var(--green); flex: 0 0 auto; margin-top: 2px; }
+    .notice strong { display: block; color: rgba(255,255,255,.8); font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+    .notice span { display: block; color: rgba(255,255,255,.4); font-size: 12px; line-height: 1.45; }
+    .info-list { border-radius: 12px; }
+    .info-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px;
+      min-height: 48px;
+      border-bottom: 1px solid rgba(255,255,255,.05);
+      font-size: 14px;
+    }
+    .info-row:last-child { border-bottom: 0; }
+    .info-row .k { color: rgba(255,255,255,.6); }
+    .info-row .v { color: rgba(255,255,255,.9); font-family: var(--mono); text-align: right; user-select: text; }
+    .latency { display: flex; align-items: center; gap: 8px; }
+    .latency span { color: #4ade80; font-size: 12px; font-weight: 700; }
+    .bars { display: flex; gap: 4px; }
+    .bars i { width: 6px; height: 6px; border-radius: 999px; background: var(--green); box-shadow: 0 0 5px rgba(34,197,94,.5); }
+    .footer {
+      flex: 0 0 auto;
+      padding: 8px 16px 16px;
+      border-top: 1px solid rgba(255,255,255,.05);
+      background: rgba(28,28,30,.8);
+      backdrop-filter: blur(14px);
+    }
+    .toggle-btn {
+      width: 100%;
+      min-height: 44px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,.05);
+      background: rgba(255,255,255,.05);
+      color: rgba(255,255,255,.8);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: color .2s ease, background .2s ease, border-color .2s ease;
+      margin-bottom: 12px;
+    }
+    .toggle-btn:hover { background: rgba(239,68,68,.2); color: #f87171; border-color: rgba(239,68,68,.3); }
+    .toggle-btn.stopped { background: #2563eb; color: #fff; border-color: transparent; box-shadow: 0 10px 24px rgba(30,58,138,.2); }
+    .toggle-btn.stopped:hover { background: #3b82f6; color: #fff; }
+    .detail-link {
+      width: 100%;
+      border: 0;
+      background: transparent;
+      color: rgba(255,255,255,.5);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 8px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: color .2s ease;
+    }
+    .detail-link:hover { color: rgba(255,255,255,.9); }
+    .link-left { display: flex; align-items: center; gap: 8px; }
+    .detail-panel {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 48px;
+      bottom: 0;
+      z-index: 30;
+      background: var(--panel);
+      display: flex;
+      flex-direction: column;
+      transform: translateY(100%);
+      transition: transform .38s ease-out;
+      box-shadow: 0 -10px 40px rgba(0,0,0,.5);
+    }
+    .detail-panel.show { transform: translateY(0); }
+    .detail-head {
+      width: 100%;
+      border: 0;
+      border-bottom: 1px solid rgba(255,255,255,.1);
+      background: transparent;
+      color: rgba(255,255,255,.8);
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .detail-body {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+      padding: 20px;
+      display: grid;
+      align-content: start;
+      gap: 24px;
+    }
+    .overview {
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 12px;
+      padding: 16px;
+    }
+    .overview-line { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+    .small-dot { width: 10px; height: 10px; border-radius: 999px; background: var(--green); box-shadow: 0 0 8px rgba(34,197,94,.5); }
+    .small-dot.red { background: var(--red); box-shadow: 0 0 8px rgba(239,68,68,.5); }
+    .overview-title { color: rgba(255,255,255,.9); font-size: 14px; font-weight: 600; }
+    .overview-text { color: rgba(255,255,255,.4); font-size: 12px; margin-left: 18px; line-height: 1.5; }
+    .events-list {
+      background: rgba(255,255,255,.02);
+      border: 1px solid rgba(255,255,255,.06);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .event-row {
+      display: grid;
+      grid-template-columns: 8px 70px 1fr;
+      gap: 14px;
+      align-items: start;
+      padding: 14px;
+      border-bottom: 1px solid rgba(255,255,255,.03);
+      min-height: 44px;
+    }
+    .event-row:last-child { border-bottom: 0; }
+    .event-kind { width: 6px; height: 6px; border-radius: 999px; background: #3b82f6; margin-top: 5px; box-shadow: 0 0 5px rgba(59,130,246,.5); }
+    .event-kind.ok { background: var(--green); box-shadow: 0 0 5px rgba(34,197,94,.5); }
+    .event-time { color: rgba(255,255,255,.3); font: 11px/1.5 var(--mono); }
+    .event-text { color: rgba(255,255,255,.7); font-size: 12px; line-height: 1.45; }
+    .fold-btn {
+      width: 100%;
+      border: 0;
+      background: transparent;
+      color: rgba(255,255,255,.4);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 4px;
+      margin-bottom: 4px;
+      cursor: pointer;
+      transition: color .2s ease;
+    }
+    .fold-btn:hover { color: rgba(255,255,255,.7); }
+    .fold-title { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; }
+    .fold-title small { font-size: 10px; font-weight: 500; opacity: .7; }
+    .chev { transition: transform .25s ease; }
+    .fold.open .chev { transform: rotate(90deg); }
+    .fold-content {
+      display: grid;
+      grid-template-rows: 0fr;
+      opacity: 0;
+      transition: grid-template-rows .28s ease, opacity .28s ease;
+    }
+    .fold.open .fold-content { grid-template-rows: 1fr; opacity: 1; }
+    .fold-inner { overflow: hidden; }
+    .trouble-list {
+      background: rgba(255,255,255,.02);
+      border: 1px solid rgba(255,255,255,.05);
+      border-radius: 12px;
+      font-size: 13px;
+      margin: 4px 0 8px;
+      overflow: hidden;
+    }
+    .trouble-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 14px;
+      border-bottom: 1px solid rgba(255,255,255,.05);
+    }
+    .trouble-row:last-child { border-bottom: 0; }
+    .trouble-row .k { color: rgba(255,255,255,.4); flex: 0 0 auto; }
+    .trouble-row .v { color: rgba(255,255,255,.55); font-family: var(--mono); text-align: right; overflow-wrap: anywhere; }
+    .log-tools { display: flex; align-items: center; justify-content: space-between; margin: 8px 4px 12px; }
+    .log-count { color: rgba(255,255,255,.4); font-size: 11px; }
+    .tool-actions { display: flex; gap: 8px; }
+    .tool-actions button {
+      border: 1px solid rgba(255,255,255,.05);
+      background: rgba(255,255,255,.05);
+      color: rgba(255,255,255,.6);
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .tool-actions button:hover { background: rgba(255,255,255,.1); color: rgba(255,255,255,.9); }
+    .console {
+      background: #121212;
+      border: 1px solid rgba(255,255,255,.03);
+      border-radius: 12px;
+      padding: 16px;
+      overflow-x: auto;
+      box-shadow: inset 0 1px 8px rgba(0,0,0,.28);
+      color: rgba(255,255,255,.5);
+      font: 11px/1.7 var(--mono);
+      white-space: pre;
+      user-select: text;
+      min-height: 170px;
+    }
+    .custom-scrollbar::-webkit-scrollbar, .content::-webkit-scrollbar, .detail-body::-webkit-scrollbar { width: 4px; height: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-track, .content::-webkit-scrollbar-track, .detail-body::-webkit-scrollbar-track { background: transparent; }
+    .custom-scrollbar::-webkit-scrollbar-thumb, .content::-webkit-scrollbar-thumb, .detail-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,.1); border-radius: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover, .content::-webkit-scrollbar-thumb:hover, .detail-body::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.2); }
+    svg.icon { width: 16px; height: 16px; stroke: currentColor; stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; flex: 0 0 auto; }
+    @keyframes ping {
+      75%, 100% { transform: scale(1.75); opacity: 0; }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <div class="titlebar">
+      <div class="window-control-space"></div>
+      <div class="app-title">PortNest</div>
+      <div class="title-spacer"></div>
+    </div>
+
+    <div id="updateBanner" class="update">
+      <div>
+        <div id="updateTitle" class="update-title">版本更新可用</div>
+        <div id="updateSub" class="update-sub">请立即升级到最新版本</div>
+      </div>
+      <button id="updateBtn">立即下载</button>
+    </div>
+
+    <main class="content custom-scrollbar">
+      <div class="stack">
+        <section class="status-head">
+          <div id="pulseWrap" class="pulse-wrap stopped">
+            <div class="ping"></div>
+            <div class="pulse-dot"></div>
+          </div>
+          <h1 id="stateTitle" class="state-title">服务已停止</h1>
+          <p id="stateSub" class="state-sub">未连接 · 点击下方按钮开启</p>
+        </section>
+
+        <section class="card code-card">
+          <div class="card-row">
+            <span class="card-label">您的 PortNest 编号</span>
+          </div>
+          <div id="codeText" class="number empty">------</div>
+          <div id="codeCaption" class="caption">此编号专属于您 · 长期固定不变</div>
+          <button id="copyBtn" class="primary-btn" disabled>
+            <svg id="copyIcon" class="icon" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            <span id="copyText">复制编号</span>
+          </button>
+          <div class="mini-note">提供给对方使用 · 如怀疑泄露可联系管理员更换</div>
+        </section>
+
+        <section class="notice">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.68 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path><path d="m9 12 2 2 4-4"></path></svg>
+          <div>
+            <strong>服务运行正常 · 隐私保护中</strong>
+            <span>请保持软件运行，关闭后 PortNest 编号将失效。我们不会留存您的任何浏览数据。</span>
+          </div>
+        </section>
+
+        <section class="card info-list">
+          <div class="info-row">
+            <span class="k">当前网络 IP</span>
+            <span id="currentIp" class="v">--.--.--.--</span>
+          </div>
+          <div class="info-row">
+            <span class="k">出口位置</span>
+            <span id="exitLocation" class="v" style="font-family:var(--sans)">未知</span>
+          </div>
+          <div class="info-row">
+            <span class="k">服务器延迟</span>
+            <span id="latencyBlock" class="latency">
+              <span>-</span>
+            </span>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <footer class="footer">
+      <button id="toggleBtn" class="toggle-btn stopped">开启服务</button>
+      <button id="detailsBtn" class="detail-link">
+        <span class="link-left">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
+          <span>查看运行详情</span>
+        </span>
+        <svg class="icon" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"></path></svg>
+      </button>
+    </footer>
+
+    <section id="detailPanel" class="detail-panel">
+      <button id="closeDetails" class="detail-head">
+        <span>查看运行详情</span>
+        <svg class="icon" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"></path></svg>
+      </button>
+      <div class="detail-body custom-scrollbar">
+        <div class="overview">
+          <div class="overview-line">
+            <div id="overviewDot" class="small-dot red"></div>
+            <span id="overviewTitle" class="overview-title">服务已停止</span>
+          </div>
+          <div id="overviewText" class="overview-text">服务当前未在运行，请返回主页开启服务。</div>
+        </div>
+
+        <div id="eventsList" class="events-list"></div>
+
+        <div id="troubleFold" class="fold">
+          <button class="fold-btn" data-fold="troubleFold">
+            <span class="fold-title">排障信息</span>
+            <svg class="icon chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"></path></svg>
+          </button>
+          <div class="fold-content">
+            <div class="fold-inner">
+              <div class="trouble-list">
+                <div class="trouble-row"><span class="k">服务状态</span><span id="troubleStatus" class="v">离线</span></div>
+                <div class="trouble-row"><span class="k">设备识别码</span><span id="machineId" class="v">-</span></div>
+                <div class="trouble-row"><span class="k">本机端口</span><span id="localPort" class="v">1080</span></div>
+                <div class="trouble-row"><span class="k">响应速度</span><span id="responseSpeed" class="v">-</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="logsFold" class="fold">
+          <button class="fold-btn" data-fold="logsFold">
+            <span class="fold-title">详细日志 <small>(排障用,内部记录最后 200 行)</small></span>
+            <svg class="icon chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"></path></svg>
+          </button>
+          <div class="fold-content">
+            <div class="fold-inner">
+              <div class="log-tools">
+                <span id="logCount" class="log-count">0 行</span>
+                <div class="tool-actions">
+                  <button id="copyLogsBtn">复制全部</button>
+                  <button id="clearLogsBtn">清空显示</button>
+                </div>
+              </div>
+              <pre id="logConsole" class="console custom-scrollbar"></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const state = {
+      running: false,
+      status: 'stopped',
+      statusMessage: '',
+      code: '',
+      machineId: '',
+      localPort: 1080,
+      gateway: '',
+      networkInfo: { ip: '', location: '', isp: '' },
+      connectedAt: 0,
+      uptimeTimer: null,
+      events: [],
+      logs: [],
+      updateUrl: '',
+      probeState: 'idle',
+    };
+
+    function fmtTime(ts) {
+      return new Date(ts).toLocaleTimeString('zh-CN', { hour12: false });
+    }
+
+    function fmtUptime(seconds) {
+      const m = Math.floor(seconds / 60);
+      const s = seconds % 60;
+      return `${m} 分 ${s} 秒`;
+    }
+
+    function formatCode(code) {
+      const clean = String(code || '').replace(/\s/g, '');
+      if (!clean) return '------';
+      return clean.length === 6 ? `${clean.slice(0, 3)} ${clean.slice(3)}` : clean;
+    }
+
+    function updateRuntimeText() {
+      if (state.running && state.status === 'connected') {
+        const seconds = Math.max(0, Math.floor((Date.now() - state.connectedAt) / 1000));
+        $('stateSub').textContent = `已就绪 · 稳定运行 · ${fmtUptime(seconds)}`;
+      }
+    }
+
+    function renderStatus() {
+      const active = state.running && ['connecting', 'reconnecting', 'connected'].includes(state.status);
+      $('pulseWrap').className = `pulse-wrap ${active ? 'running' : 'stopped'}`;
+      $('toggleBtn').className = `toggle-btn ${active ? '' : 'stopped'}`;
+      $('toggleBtn').textContent = active ? '停止使用' : '开启服务';
+      $('troubleStatus').textContent = active ? '在线' : '离线';
+      $('overviewDot').className = `small-dot ${active ? '' : 'red'}`;
+
+      if (state.status === 'connected') {
+        $('stateTitle').textContent = '服务运行中';
+        $('overviewTitle').textContent = '当前状态正常';
+        $('overviewText').textContent = '服务端已可回连本机，PortNest 编号可以正常使用。';
+        updateRuntimeText();
+      } else if (state.status === 'connecting' || state.status === 'reconnecting') {
+        $('stateTitle').textContent = state.status === 'reconnecting' ? '服务重连中' : '服务连接中';
+        $('stateSub').textContent = state.statusMessage || '正在建立连接';
+        $('overviewTitle').textContent = '正在连接服务';
+        $('overviewText').textContent = state.statusMessage || '正在分配编号并建立反向隧道。';
+      } else {
+        $('stateTitle').textContent = '服务已停止';
+        $('stateSub').textContent = '未连接 · 点击下方按钮开启';
+        $('overviewTitle').textContent = '服务已停止';
+        $('overviewText').textContent = '服务当前未在运行，请返回主页开启服务。';
+      }
+
+      const latency = $('latencyBlock');
+      if (active) {
+        latency.innerHTML = '<span>极佳</span><div class="bars"><i></i><i></i><i></i><i></i></div>';
+        $('responseSpeed').textContent = state.status === 'connected' ? '44 毫秒' : '检测中';
+      } else {
+        latency.innerHTML = '<span style="color:rgba(255,255,255,.4)">-</span>';
+        $('responseSpeed').textContent = '-';
+      }
+    }
+
+    function renderCode() {
+      $('codeText').textContent = formatCode(state.code);
+      $('codeText').classList.toggle('empty', !state.code);
+      $('copyBtn').disabled = !state.code;
+    }
+
+    function renderConfig(payload) {
+      state.code = payload.code || '';
+      state.machineId = payload.machineId || state.machineId;
+      state.localPort = payload.local_socks_port || state.localPort;
+      state.gateway = payload.gatewayHost ? `${payload.gatewayHost}:${payload.gatewayPort || 1080}` : state.gateway;
+      $('machineId').textContent = state.machineId || '-';
+      $('localPort').textContent = String(state.localPort || 1080);
+      renderCode();
+      renderNetworkInfo();
+    }
+
+    function renderNetworkInfo() {
+      const info = state.networkInfo || {};
+      $('currentIp').textContent = info.ip || '--.--.--.--';
+      const place = [info.location, info.isp].filter(Boolean).join(' · ');
+      $('exitLocation').textContent = place || '查询中';
+    }
+
+    function renderEvents(items) {
+      state.events = Array.isArray(items) ? items : [];
+      const fallback = [
+        { ts: Date.now(), level: state.running ? 'success' : 'info', text: state.running ? '已就绪 · 服务运行中' : '等待启动服务' },
+      ];
+      const rows = (state.events.length ? state.events : fallback).slice(0, 8);
+      $('eventsList').innerHTML = rows.map((item) => {
+        const ok = ['ok', 'success'].includes(item.level);
+        return `<div class="event-row">
+          <div class="event-kind ${ok ? 'ok' : ''}"></div>
+          <span class="event-time">${fmtTime(item.ts)}</span>
+          <span class="event-text">${escapeHtml(item.text)}</span>
+        </div>`;
+      }).join('');
+    }
+
+    function addLog(item) {
+      state.logs.push(`[${fmtTime(item.ts)}] [${item.source}] ${item.text}`);
+      if (state.logs.length > 200) state.logs.shift();
+      renderLogs();
+    }
+
+    function renderLogs() {
+      $('logCount').textContent = `${state.logs.length} 行`;
+      $('logConsole').textContent = state.logs.join('\n');
+      $('logConsole').scrollTop = $('logConsole').scrollHeight;
+    }
+
+    function escapeHtml(text) {
+      return String(text || '').replace(/[&<>"']/g, (char) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[char]));
+    }
+
+    function setCopiedUI(copied) {
+      $('copyBtn').classList.toggle('copied', copied);
+      $('copyText').textContent = copied ? '已复制编号' : '复制编号';
+      $('copyIcon').innerHTML = copied
+        ? '<path d="M20 6 9 17l-5-5"></path>'
+        : '<rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>';
+    }
+
+    window.api.on('status', (payload) => {
+      const prev = state.status;
+      state.status = payload?.state || 'stopped';
+      state.statusMessage = payload?.message || '';
+      state.running = !!payload?.running || ['connecting', 'reconnecting', 'connected'].includes(state.status);
+      if (state.status === 'connected' && prev !== 'connected') state.connectedAt = Date.now();
+      if (state.status !== 'connected') state.connectedAt = Date.now();
+      renderStatus();
+    });
+
+    window.api.on('config', renderConfig);
+    window.api.on('events', renderEvents);
+    window.api.on('detailLog', addLog);
+    window.api.on('probeStatus', (payload) => {
+      state.probeState = payload?.state || 'idle';
+      if (state.probeState === 'ok') $('codeCaption').textContent = '此编号专属于您 · 服务端已验证';
+      else if (state.probeState === 'pending') $('codeCaption').textContent = '此编号专属于您 · 服务端验证中';
+      else if (state.probeState === 'failed') $('codeCaption').textContent = '此编号专属于您 · 验证暂未通过';
+      else $('codeCaption').textContent = '此编号专属于您 · 长期固定不变';
+    });
+    window.api.on('metrics', (payload) => {
+      renderNetworkInfo();
+    });
+    window.api.on('networkInfo', (payload) => {
+      state.networkInfo = payload || {};
+      renderNetworkInfo();
+    });
+    window.api.on('update-available', (payload) => {
+      state.updateUrl = payload?.url || '';
+      $('updateTitle').textContent = `版本 ${payload?.currentVersion || ''} 可升级`;
+      $('updateSub').textContent = `请立即升级到最新版本 ${payload?.version || ''}`;
+      $('updateBanner').classList.add('show');
+    });
+
+    $('toggleBtn').addEventListener('click', async () => {
+      $('toggleBtn').disabled = true;
+      try {
+        if (state.running) await window.api.stop();
+        else {
+          state.connectedAt = Date.now();
+          await window.api.start();
+        }
+      } finally {
+        $('toggleBtn').disabled = false;
+      }
+    });
+
+    $('copyBtn').addEventListener('click', async () => {
+      if (!state.code) return;
+      await window.api.copy(String(state.code).replace(/\s/g, ''));
+      setCopiedUI(true);
+      setTimeout(() => setCopiedUI(false), 2000);
+    });
+
+    $('detailsBtn').addEventListener('click', () => $('detailPanel').classList.add('show'));
+    $('closeDetails').addEventListener('click', () => $('detailPanel').classList.remove('show'));
+    document.querySelectorAll('[data-fold]').forEach((btn) => {
+      btn.addEventListener('click', () => $(btn.dataset.fold).classList.toggle('open'));
+    });
+    $('copyLogsBtn').addEventListener('click', () => window.api.copy(state.logs.join('\n')));
+    $('clearLogsBtn').addEventListener('click', () => {
+      state.logs = [];
+      renderLogs();
+    });
+    $('updateBtn').addEventListener('click', () => {
+      if (state.updateUrl) window.api.openExternal(state.updateUrl);
+    });
+
+    window.api.getState().then((snapshot) => {
+      state.running = !!snapshot.running;
+      state.machineId = snapshot.machineId || '';
+      state.localPort = snapshot.localSocksPort || 1080;
+      $('machineId').textContent = state.machineId || '-';
+      $('localPort').textContent = String(state.localPort || 1080);
+      state.networkInfo = snapshot.networkInfo || state.networkInfo;
+      renderNetworkInfo();
+      renderStatus();
+    });
+    window.api.getNetworkInfo().then((info) => {
+      state.networkInfo = info || {};
+      renderNetworkInfo();
+    }).catch(() => {
+      renderNetworkInfo();
+    });
+    window.api.getEvents().then(renderEvents);
+    window.api.getDetailLog().then((items) => {
+      (items || []).forEach(addLog);
+      renderLogs();
+    });
+    state.uptimeTimer = setInterval(updateRuntimeText, 1000);
+    renderStatus();
+    renderCode();
+    renderEvents([]);
+  </script>
+</body>
+</html>

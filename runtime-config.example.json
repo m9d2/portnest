@@ -1,0 +1,6 @@
+{
+  "DISPATCHER_URLS": "https://your-dispatcher.example.com",
+  "CLIENT_SECRET": "",
+  "APP_BRAND": "local",
+  "LOCAL_SOCKS_HINT": 1080
+}
