@@ -578,7 +578,7 @@
       uptimeTimer: null,
       events: [],
       logs: [],
-      updateUrl: '',
+      updateState: '',
       probeState: 'idle',
     };
 
@@ -734,10 +734,38 @@
       renderNetworkInfo();
     });
     window.api.on('update-available', (payload) => {
-      state.updateUrl = payload?.url || '';
+      state.updateState = 'available';
       $('updateTitle').textContent = `版本 ${payload?.currentVersion || ''} 可升级`;
       $('updateSub').textContent = `请立即升级到最新版本 ${payload?.version || ''}`;
+      $('updateBtn').textContent = '下载更新';
+      $('updateBtn').disabled = false;
       $('updateBanner').classList.add('show');
+    });
+    window.api.on('update', (payload) => {
+      state.updateState = payload?.state || '';
+      if (state.updateState === 'checking') {
+        $('updateTitle').textContent = '正在检查更新';
+        $('updateSub').textContent = '请稍候';
+        $('updateBtn').textContent = '检查中';
+        $('updateBtn').disabled = true;
+      } else if (state.updateState === 'downloading') {
+        $('updateTitle').textContent = '正在下载更新';
+        $('updateSub').textContent = `下载进度 ${payload?.percent || 0}%`;
+        $('updateBtn').textContent = `${payload?.percent || 0}%`;
+        $('updateBtn').disabled = true;
+      } else if (state.updateState === 'downloaded') {
+        $('updateTitle').textContent = `新版本 ${payload?.version || ''} 已下载`;
+        $('updateSub').textContent = '点击安装并重启 PortNest';
+        $('updateBtn').textContent = '安装更新';
+        $('updateBtn').disabled = false;
+        $('updateBanner').classList.add('show');
+      } else if (state.updateState === 'error') {
+        $('updateTitle').textContent = '更新检查失败';
+        $('updateSub').textContent = payload?.message || '请稍后重试';
+        $('updateBtn').textContent = '重试';
+        $('updateBtn').disabled = false;
+        $('updateBanner').classList.add('show');
+      }
     });
 
     $('toggleBtn').addEventListener('click', async () => {
@@ -771,7 +799,13 @@
       renderLogs();
     });
     $('updateBtn').addEventListener('click', () => {
-      if (state.updateUrl) window.api.openExternal(state.updateUrl);
+      if (state.updateState === 'downloaded') {
+        window.api.installUpdate();
+      } else if (state.updateState === 'error') {
+        window.api.checkForUpdates();
+      } else {
+        window.api.downloadUpdate();
+      }
     });
 
     window.api.getState().then((snapshot) => {

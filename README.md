@@ -31,3 +31,26 @@ CLIENT_SECRET='change-me' TUNNEL_PSK='change-me' SERVER_IP='127.0.0.1' go run ./
 ```
 
 The reverse tunnel transport still requires a matching `frps` process. See `server/README.md` and `server/configs/frps.example.toml`.
+
+## GitHub Release Builds
+
+Repository: `m9d2/portnest`
+
+GitHub Actions builds macOS arm64 and x64 packages when a tag matching `v*` is pushed. The workflow publishes assets to GitHub Releases and generates `latest-mac.yml` for `electron-updater`.
+
+Configure these GitHub repository secrets before tagging a release:
+
+- `DISPATCHER_URLS`: production dispatcher URL, for example `http://43.130.53.127:8422`
+- `CLIENT_SECRET`: client HMAC secret
+
+The workflow writes `runtime-config.json` during CI from those secrets. Do not commit `runtime-config.json`.
+
+Release flow:
+
+```bash
+npm version patch
+git push
+git push --tags
+```
+
+Unsigned macOS builds are generated with `CSC_IDENTITY_AUTO_DISCOVERY=false`. They can be installed, but macOS may show Gatekeeper warnings. For a smoother production install and update experience, add Apple Developer ID signing and notarization secrets later.

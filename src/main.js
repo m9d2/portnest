@@ -870,7 +870,7 @@ function createWindow() {
     title: 'PortNest',
     backgroundColor: '#1c1c1e',
     titleBarStyle: 'hiddenInset',
-    icon: path.join(__dirname, 'renderer', 'portnest-icon.png'),
+    icon: path.join(__dirname, 'renderer', 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -891,9 +891,9 @@ function createWindow() {
 function trayIcon() {
   const candidates = [
     path.join(__dirname, 'renderer', 'statusbar-icon.png'),
-    path.join(__dirname, 'renderer', 'portnest-icon.png'),
+    path.join(__dirname, 'renderer', 'icon.png'),
     path.join(resourcesRoot(), 'src', 'renderer', 'statusbar-icon.png'),
-    path.join(resourcesRoot(), 'src', 'renderer', 'portnest-icon.png'),
+    path.join(resourcesRoot(), 'src', 'renderer', 'icon.png'),
     path.join(resourcesRoot(), 'icon.png'),
   ];
   const iconPath = candidates.find((item) => fs.existsSync(item));
