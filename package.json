@@ -1,6 +1,6 @@
 {
   "name": "portnest",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Electron desktop client for a dispatcher-managed SOCKS5 reverse tunnel",
   "main": "src/main.js",
   "author": "",
