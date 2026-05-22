@@ -9,9 +9,12 @@ permissions:
   contents: write
 
 jobs:
-  mac:
-    name: Build macOS arm64 and x64
-    runs-on: macos-latest
+  build:
+    name: Build macOS and Windows
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
 
     steps:
       - uses: actions/checkout@v4
@@ -22,7 +25,6 @@ jobs:
           cache: npm
 
       - run: npm ci --registry=https://registry.npmjs.org --foreground-scripts
-        timeout-minutes: 15
 
       - name: Write runtime config
         run: node scripts/write-runtime-config.js
@@ -32,36 +34,51 @@ jobs:
           APP_BRAND: portnest
           LOCAL_SOCKS_HINT: "1080"
 
-      - name: Build and publish macOS releases
-        run: npm run dist:mac:release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      - name: Build
+        run: |
+          if [ "${{ matrix.os }}" == "macos-latest" ]; then
+            npm run dist:mac -- --publish never
+          else
+            npm run dist:win -- --publish never
+          fi
 
-  windows:
-    name: Build Windows x64
-    runs-on: windows-latest
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.os }}-build
+          path: dist/
 
+  publish:
+    name: Publish Release
+    runs-on: ubuntu-latest
+    needs: build
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
         with:
-          node-version: 20
-          cache: npm
+          name: macos-latest-build
+          path: dist/mac
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-latest-build
+          path: dist/win
 
-      - run: npm ci --registry=https://registry.npmjs.org --foreground-scripts
-        timeout-minutes: 15
-
-      - name: Write runtime config
-        run: node scripts/write-runtime-config.js
+      - name: Create / Update Draft Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          draft: true
+          prerelease: false
         env:
-          DISPATCHER_URLS: ${{ secrets.DISPATCHER_URLS }}
-          CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
-          APP_BRAND: portnest
-          LOCAL_SOCKS_HINT: "1080"
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and publish Windows x64 release
-        run: npm run dist:win:release
+      - name: Upload assets to Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            dist/mac/*.dmg
+            dist/win/*.exe
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
