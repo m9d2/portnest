@@ -1,7 +1,7 @@
 {
-  "name": "portnest-mac-client",
+  "name": "portnest-desktop-client",
   "version": "1.0.0",
-  "description": "Electron macOS client for a dispatcher-managed SOCKS5 reverse tunnel",
+  "description": "Electron desktop client for a dispatcher-managed SOCKS5 reverse tunnel",
   "main": "src/main.js",
   "author": "",
   "license": "UNLICENSED",
@@ -11,7 +11,10 @@
     "check": "node --check src/main.js && node --check src/preload.js",
     "pack:mac": "electron-builder --mac dir",
     "dist:mac": "electron-builder --mac dmg zip",
-    "dist:mac:release": "electron-builder --mac dmg zip --x64 --arm64 --publish always"
+    "dist:mac:release": "electron-builder --mac dmg zip --x64 --arm64 --publish always",
+    "pack:win": "electron-builder --win dir --x64",
+    "dist:win": "electron-builder --win nsis --x64",
+    "dist:win:release": "electron-builder --win nsis --x64 --publish always"
   },
   "dependencies": {
     "electron-updater": "^6.8.3"
