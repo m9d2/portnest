@@ -21,7 +21,8 @@ jobs:
           node-version: 20
           cache: npm
 
-      - run: npm ci
+      - run: npm ci --registry=https://registry.npmjs.org --foreground-scripts
+        timeout-minutes: 15
 
       - name: Write runtime config
         run: node scripts/write-runtime-config.js
@@ -49,7 +50,8 @@ jobs:
           node-version: 20
           cache: npm
 
-      - run: npm ci
+      - run: npm ci --registry=https://registry.npmjs.org --foreground-scripts
+        timeout-minutes: 15
 
       - name: Write runtime config
         run: node scripts/write-runtime-config.js
