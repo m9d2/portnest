@@ -914,9 +914,24 @@ function createWindow() {
     if (!isQuitting) {
       event.preventDefault();
       win.hide();
+      hideDock();
       pushEvent('info', '窗口已隐藏，可从状态栏恢复');
     }
   });
+}
+
+function showMainWindow() {
+  showDock();
+  win?.show();
+  win?.focus();
+}
+
+function hideDock() {
+  if (process.platform === 'darwin' && app.dock) app.dock.hide();
+}
+
+function showDock() {
+  if (process.platform === 'darwin' && app.dock) app.dock.show();
 }
 
 function trayIcon() {
@@ -937,8 +952,9 @@ function trayIcon() {
 function refreshTrayMenu() {
   if (!tray) return;
   tray.setContextMenu(Menu.buildFromTemplate([
-    { label: '显示 PortNest', click: () => { win?.show(); win?.focus(); } },
+    { label: '显示 PortNest', click: showMainWindow },
     { label: running ? '停止服务' : '启动服务', click: () => (running ? stop() : start()) },
+    { label: '检查更新', click: () => autoUpdater.checkForUpdates().catch(() => {}) },
     { type: 'separator' },
     {
       label: '退出',
@@ -972,7 +988,7 @@ function dockMenuTemplate() {
     { label: `本地 SOCKS5：127.0.0.1:${localSocksPort}`, enabled: false },
     { label: `网关：${gatewayHost ? `${gatewayHost}:${gatewayPort}` : '未分配'}`, enabled: false },
     { type: 'separator' },
-    { label: '显示 PortNest', click: () => { win?.show(); win?.focus(); } },
+    { label: '显示 PortNest', click: showMainWindow },
     { label: running ? '停止服务' : '启动服务', click: () => (running ? stop() : start()) },
     { type: 'separator' },
     {
@@ -996,12 +1012,7 @@ function createTray() {
   refreshTrayMenu();
   refreshDockMenu();
   tray.on('click', () => {
-    if (!win) return;
-    if (win.isVisible()) win.hide();
-    else {
-      win.show();
-      win.focus();
-    }
+    tray.popUpContextMenu();
   });
 }
 
