@@ -49,9 +49,13 @@ The workflow writes `runtime-config.json` during CI from those secrets. Do not c
 Release flow:
 
 ```bash
-npm version patch
-git push
-git push --tags
+npm run release -- 1.0.1
 ```
 
-Unsigned macOS builds are generated with `CSC_IDENTITY_AUTO_DISCOVERY=false`. They can be installed, but macOS may show Gatekeeper warnings. For a smoother production install and update experience, add Apple Developer ID signing and notarization secrets later. Windows builds use the checked-in `bin/win32-x64` tunnel binaries and produce an unsigned NSIS installer.
+macOS builds are unsigned because the project does not currently use an Apple Developer ID certificate. Gatekeeper may report the downloaded app as damaged. For local testing, remove the quarantine flag after installing:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/PortNest.app
+```
+
+Windows builds use the checked-in `bin/win32-x64` tunnel binaries and produce an unsigned NSIS installer.

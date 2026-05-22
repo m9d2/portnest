@@ -140,19 +140,33 @@ function setupAutoUpdater() {
     send('update', { state: 'downloaded', version: info.version });
   });
   autoUpdater.on('error', (error) => {
-    logDetail('update', error?.message || String(error));
-    send('update', { state: 'error', message: error?.message || String(error) });
+    if (isMissingUpdateFeed(error)) {
+      logDetail('update', '暂未找到可用更新，已跳过自动更新检查');
+      send('update', { state: 'not-available', version: APP_VERSION });
+      return;
+    }
+    const message = formatUpdateError(error);
+    logDetail('update', message);
+    send('update', { state: 'error', message });
   });
 
   if (app.isPackaged) {
     setTimeout(() => {
-      autoUpdater.checkForUpdates().catch((error) => {
-        logDetail('update', error?.message || String(error));
-      });
+      autoUpdater.checkForUpdates().catch(() => {});
     }, 3000);
   } else {
     logDetail('update', '开发模式跳过自动更新检查');
   }
+}
+
+function formatUpdateError(error) {
+  const message = error?.message || String(error);
+  return message.split('\n')[0].slice(0, 240);
+}
+
+function isMissingUpdateFeed(error) {
+  const message = error?.message || String(error);
+  return /Unable to find latest version|Cannot parse releases feed|HttpError:\s*(404|406)/i.test(message);
 }
 
 function pushEvent(level, text) {
@@ -522,7 +536,11 @@ function frpcConfigPath() {
   return path.join(app.getPath('userData'), 'frpc.toml');
 }
 
-function writeFrpcConfig(assignment) {
+function nextFrpcProxyName() {
+  return `portnest-${Date.now().toString(36)}-${crypto.randomBytes(4).toString('hex')}`;
+}
+
+function writeFrpcConfig(assignment, proxyName) {
   const config = [
     `serverAddr = "${assignment.server_ip}"`,
     `serverPort = ${assignment.server_port}`,
@@ -539,7 +557,7 @@ function writeFrpcConfig(assignment) {
     `log.level = "info"`,
     '',
     '[[proxies]]',
-    `name = "portnest-${machineId}"`,
+    `name = "${proxyName}"`,
     'type = "tcp"',
     'localIP = "127.0.0.1"',
     `localPort = ${localSocksPort}`,
@@ -629,8 +647,9 @@ async function startTunnel() {
     return;
   }
 
-  const cfgPath = writeFrpcConfig(tunnelAssignment);
-  logDetail('tunnel', `spawn frpc -> ${tunnelAssignment.server_ip}:${tunnelAssignment.server_port} remote=${tunnelAssignment.remote_port}`);
+  const proxyName = nextFrpcProxyName();
+  const cfgPath = writeFrpcConfig(tunnelAssignment, proxyName);
+  logDetail('tunnel', `spawn frpc -> ${tunnelAssignment.server_ip}:${tunnelAssignment.server_port} remote=${tunnelAssignment.remote_port} proxy=${proxyName}`);
   setStatus('connecting', '正在建立连接');
 
   const child = spawn(frpcBin, ['-c', cfgPath], { stdio: ['ignore', 'pipe', 'pipe'] });
@@ -666,9 +685,21 @@ async function startTunnel() {
       send('probeStatus', { state: tunnelAssignment.verified_recent ? 'ok' : 'pending', startedAt: Date.now() });
       startStatusPoll();
     }
-    if (/authentication failed|auth.*invalid|proxy name.*already/i.test(line)) {
+    if (/authentication failed|auth.*invalid/i.test(line)) {
       tunnelAssignment = null;
       pushEvent('warn', '隧道配置失效，正在重新接入');
+      try {
+        child.kill('SIGTERM');
+      } catch {}
+      return;
+    }
+    if (/proxy .*already exists|proxy name.*already/i.test(line)) {
+      lastFrpcError = line.slice(0, 200);
+      pushEvent('warn', '隧道名称冲突，正在重试');
+      try {
+        child.kill('SIGTERM');
+      } catch {}
+      return;
     }
     if (/connect to server error|failed|error/i.test(line)) {
       if (!loginSuccess) lastFrpcError = line.slice(0, 200);

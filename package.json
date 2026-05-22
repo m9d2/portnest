@@ -14,7 +14,8 @@
     "dist:mac:release": "electron-builder --mac dmg zip --x64 --arm64 --publish always",
     "pack:win": "electron-builder --win dir --x64",
     "dist:win": "electron-builder --win nsis --x64",
-    "dist:win:release": "electron-builder --win nsis --x64 --publish always"
+    "dist:win:release": "electron-builder --win nsis --x64 --publish always",
+    "release": "node scripts/release-version.js"
   },
   "dependencies": {
     "electron-updater": "^6.8.3"
@@ -39,15 +40,7 @@
       "runtime-config.json",
       "package.json"
     ],
-    "extraResources": [
-      {
-        "from": "bin",
-        "to": "bin",
-        "filter": [
-          "**/*"
-        ]
-      }
-    ],
+    "afterPack": "scripts/after-pack.js",
     "mac": {
       "icon": "build/icon.icns",
       "category": "public.app-category.utilities",
