@@ -1,59 +1,21 @@
 {
   "name": "portnest",
   "version": "1.0.6",
-  "description": "Electron desktop client for a dispatcher-managed SOCKS5 reverse tunnel",
-  "main": "src/main.js",
+  "description": "Tauri desktop client for a dispatcher-managed SOCKS5 reverse tunnel",
   "author": "",
   "license": "UNLICENSED",
   "private": true,
   "scripts": {
-    "start": "electron .",
-    "check": "node --check src/main.js && node --check src/preload.js",
-    "pack:mac": "electron-builder --mac dir",
-    "dist:mac": "electron-builder --mac dmg zip",
-    "dist:mac:release": "electron-builder --mac dmg zip --x64 --arm64 --publish always",
-    "pack:win": "electron-builder --win dir --x64",
-    "dist:win": "electron-builder --win nsis --x64",
-    "dist:win:release": "electron-builder --win nsis --x64 --publish always",
-    "release": "node scripts/release-version.js"
-  },
-  "dependencies": {
-    "electron-updater": "^6.8.3"
+    "start": "tauri dev",
+    "check": "node --check src/renderer/tauri-bridge.js && node --check scripts/prepare-tauri-sidecars.js && node --check scripts/release-version.js && node --check scripts/write-runtime-config.js",
+    "release": "node scripts/release-version.js",
+    "tauri": "tauri",
+    "tauri:prepare": "node scripts/prepare-tauri-sidecars.js",
+    "tauri:check": "cargo check --manifest-path src-tauri/Cargo.toml",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build"
   },
   "devDependencies": {
-    "electron": "^30.5.1",
-    "electron-builder": "^24.13.3"
-  },
-  "build": {
-    "appId": "com.m9d2.portnest",
-    "productName": "PortNest",
-    "asar": true,
-    "publish": [
-      {
-        "provider": "github",
-        "owner": "m9d2",
-        "repo": "portnest"
-      }
-    ],
-    "files": [
-      "src/**/*",
-      "runtime-config.json",
-      "package.json"
-    ],
-    "afterPack": "scripts/after-pack.js",
-    "mac": {
-      "icon": "build/icon.icns",
-      "category": "public.app-category.utilities",
-      "target": [
-        "dmg",
-        "zip"
-      ]
-    },
-    "win": {
-      "icon": "build/icon.ico",
-      "target": [
-        "nsis"
-      ]
-    }
+    "@tauri-apps/cli": "^2.0.0"
   }
 }
