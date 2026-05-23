@@ -895,9 +895,9 @@ function getState() {
 function createWindow() {
   win = new BrowserWindow({
     width: 420,
-    height: 700,
+    height: 780,
     minWidth: 380,
-    minHeight: 620,
+    minHeight: 700,
     title: 'PortNest',
     backgroundColor: '#1c1c1e',
     titleBarStyle: 'hiddenInset',

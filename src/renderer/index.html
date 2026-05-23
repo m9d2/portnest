@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh">
+<html lang="zh-CN">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -7,527 +7,840 @@
   <style>
     :root {
       color-scheme: dark;
-      --window: #1c1c1e;
-      --panel: #1a1a1c;
-      --text: #ffffff;
-      --muted: rgba(255,255,255,.5);
-      --faint: rgba(255,255,255,.3);
-      --line: rgba(255,255,255,.08);
-      --blue: #2563eb;
-      --green: #22c55e;
-      --red: #ef4444;
-      --mono: ui-monospace, "SF Mono", Menlo, Monaco, Consolas, monospace;
+      --window: #0f0f11;
+      --drawer: #0a0a0c;
+      --surface: rgba(255, 255, 255, .04);
+      --surface-hover: rgba(255, 255, 255, .06);
+      --line: rgba(255, 255, 255, .08);
+      --line-soft: rgba(255, 255, 255, .05);
+      --text: rgba(255, 255, 255, .92);
+      --muted: rgba(255, 255, 255, .43);
+      --faint: rgba(255, 255, 255, .28);
+      --green: #34d399;
+      --green-strong: #10b981;
+      --rose: #fb7185;
+      --blue: #60a5fa;
+      --mono: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
       --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", system-ui, sans-serif;
     }
     * { box-sizing: border-box; }
-    html, body { width: 100%; min-height: 100%; margin: 0; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+    }
     body {
-      min-height: 100vh;
-      background: #171717;
+      background: var(--window);
       color: var(--text);
       font-family: var(--sans);
-      overflow: hidden;
       -webkit-font-smoothing: antialiased;
+      overflow: hidden;
       user-select: none;
     }
-    body::before {
-      content: "";
-      position: fixed;
-      inset: 0;
-      background:
-        radial-gradient(circle at 20% 0%, rgba(49,46,129,.2), transparent 34%),
-        radial-gradient(circle at 82% 18%, rgba(88,28,135,.18), transparent 38%),
-        linear-gradient(135deg, rgba(49,46,129,.12), rgba(0,0,0,.4));
-      pointer-events: none;
+    button {
+      border: 0;
+      font: inherit;
+      color: inherit;
+      cursor: pointer;
     }
-    button { font: inherit; }
     .app-shell {
       position: relative;
-      width: 100vw;
-      height: 100vh;
-      background: rgba(28,28,30,.9);
-      border: 1px solid rgba(255,255,255,.1);
-      overflow: hidden;
       display: flex;
       flex-direction: column;
+      width: 100%;
+      height: 100%;
+      min-height: 620px;
+      overflow: hidden;
+      background: var(--window);
+      border: 1px solid var(--line);
     }
+    .app-shell::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 220px;
+      pointer-events: none;
+      background: linear-gradient(180deg, rgba(16,185,129,.11), transparent);
+      opacity: 0;
+      transition: opacity .5s ease;
+    }
+    .app-shell.online::before { opacity: 1; }
     .titlebar {
-      height: 48px;
+      position: relative;
+      z-index: 2;
+      height: 54px;
+      flex: 0 0 54px;
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      padding: 0 16px;
+      justify-content: center;
       -webkit-app-region: drag;
-      flex: 0 0 auto;
     }
-    .window-control-space { width: 64px; flex: 0 0 64px; }
-    .app-title { font-size: 14px; font-weight: 500; color: rgba(255,255,255,.8); }
-    .title-spacer { width: 64px; }
-    .update {
-      margin: 0 16px 16px;
-      background: rgba(59,130,246,.15);
-      border: 1px solid rgba(59,130,246,.2);
-      border-radius: 8px;
-      padding: 12px;
-      display: none;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      animation: fadeIn .22s ease-out;
-    }
-    .update.show { display: flex; }
-    .update-title { color: #60a5fa; font-size: 12px; font-weight: 600; }
-    .update-sub { color: rgba(255,255,255,.8); font-size: 11px; margin-top: 2px; }
-    .update button {
-      border: 0;
-      border-radius: 6px;
-      background: #2563eb;
-      color: #fff;
-      padding: 6px 12px;
-      font-size: 12px;
+    .app-title {
+      color: rgba(255,255,255,.8);
+      font-size: 13px;
+      line-height: 1;
       font-weight: 600;
-      cursor: pointer;
-      white-space: nowrap;
+      text-transform: uppercase;
+      letter-spacing: 0;
     }
-    .content {
+    .update {
+      position: absolute;
+      z-index: 25;
+      top: 62px;
+      left: 20px;
+      right: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(-12px);
+      transition: opacity .25s ease, transform .25s ease;
+    }
+    .update.show {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateY(0);
+    }
+    .update-pill {
+      max-width: 100%;
+      min-height: 40px;
+      padding: 6px 7px 6px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(31,31,34,.94);
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 999px;
+      box-shadow: 0 12px 30px rgba(0,0,0,.34);
+      backdrop-filter: blur(20px);
+    }
+    .update-title {
+      min-width: 0;
+      color: rgba(255,255,255,.86);
+      font-size: 11px;
+      font-weight: 500;
+      line-height: 1.35;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      overflow: hidden;
+    }
+    .update-sub { display: none; }
+    .update-action {
+      position: relative;
+      min-width: 54px;
+      height: 25px;
+      padding: 0 12px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: #fff;
+      color: #09090b;
+      font-size: 10px;
+      line-height: 25px;
+      font-weight: 700;
+    }
+    .update-action.done {
+      background: var(--green-strong);
+      color: #06120d;
+    }
+    .update-progress {
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 0;
+      background: rgba(0,0,0,.1);
+      transition: width .22s ease;
+    }
+    .update-action span { position: relative; z-index: 1; }
+    .update-close {
+      width: 25px;
+      height: 25px;
+      display: grid;
+      place-items: center;
+      border-radius: 999px;
+      background: transparent;
+      color: rgba(255,255,255,.38);
+    }
+    .update-close:hover { color: rgba(255,255,255,.85); background: rgba(255,255,255,.06); }
+    .dashboard {
+      position: relative;
+      z-index: 1;
       flex: 1 1 auto;
       min-height: 0;
+      padding: 22px 20px 14px;
       overflow-y: auto;
-      padding: 0 16px 24px;
     }
-    .stack { display: grid; gap: 24px; }
     .status-head {
       display: flex;
       flex-direction: column;
       align-items: center;
-      margin-top: 8px;
+      padding: 8px 0 26px;
       text-align: center;
     }
-    .pulse-wrap {
+    .radar {
       position: relative;
-      width: 64px;
-      height: 64px;
-      border-radius: 999px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 12px;
-      transition: background .5s ease;
+      width: 96px;
+      height: 96px;
+      display: grid;
+      place-items: center;
     }
-    .pulse-wrap.running { background: rgba(34,197,94,.1); }
-    .pulse-wrap.stopped { background: rgba(239,68,68,.1); }
-    .ping {
+    .radar-ring,
+    .radar-ring-inner {
       position: absolute;
-      inset: 0;
       border-radius: 999px;
-      background: var(--green);
-      opacity: .2;
-      animation: ping 1.5s cubic-bezier(0,0,.2,1) infinite;
+      transition: border-color .5s ease;
     }
-    .pulse-dot {
-      width: 16px;
-      height: 16px;
-      border-radius: 999px;
-      background: var(--green);
-      box-shadow: 0 0 15px rgba(34,197,94,.5);
-    }
-    .pulse-wrap.stopped .ping { display: none; }
-    .pulse-wrap.stopped .pulse-dot { background: var(--red); box-shadow: 0 0 15px rgba(239,68,68,.5); }
-    .state-title { margin: 0; font-size: 20px; line-height: 1.25; font-weight: 600; }
-    .state-sub { margin: 6px 0 0; font-size: 12px; color: rgba(255,255,255,.5); font-weight: 500; }
-    .card {
-      position: relative;
-      border-radius: 16px;
-      background: rgba(255,255,255,.03);
-      border: 1px solid rgba(255,255,255,.08);
-      overflow: hidden;
-    }
-    .code-card { padding: 20px; }
-    .code-card::before {
-      content: "";
-      position: absolute;
+    .radar-ring {
       inset: 0;
-      background: linear-gradient(to bottom, rgba(255,255,255,.04), transparent);
-      pointer-events: none;
+      border: 1px solid rgba(255,255,255,.1);
     }
-    .card-row {
+    .radar-ring-inner {
+      inset: 9px;
+      border: 1px dashed rgba(255,255,255,.06);
+    }
+    .radar.online .radar-ring {
+      border-color: rgba(16,185,129,.32);
+      animation: spin 4s linear infinite;
+    }
+    .radar.online .radar-ring-inner {
+      border-color: rgba(16,185,129,.23);
+      animation: spin 6s linear infinite reverse;
+    }
+    .shield-core {
       position: relative;
       z-index: 1;
+      width: 48px;
+      height: 48px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      color: #9ca3af;
+      background: #27272a;
+      box-shadow: 0 10px 22px rgba(0,0,0,.38);
+      transition: color .45s ease, background .45s ease, box-shadow .45s ease;
+    }
+    .radar.online .shield-core {
+      background: var(--green-strong);
+      color: #04100b;
+      box-shadow: 0 10px 26px rgba(16,185,129,.37);
+    }
+    .state-title {
+      margin: 22px 0 0;
+      font-size: 24px;
+      line-height: 1.2;
+      font-weight: 700;
+      color: rgba(255,255,255,.82);
+      transition: color .4s ease;
+      letter-spacing: 0;
+    }
+    .state-title.online { color: #34d399; }
+    .state-sub {
+      margin: 7px 0 0;
+      color: var(--muted);
+      font: 11px/1.45 var(--mono);
+      text-transform: uppercase;
+      letter-spacing: 0;
+    }
+    .data-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .tile {
+      min-width: 0;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+    }
+    .id-card {
+      position: relative;
+      grid-column: 1 / -1;
+      width: 100%;
+      min-height: 132px;
+      padding: 17px 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      text-align: left;
+      overflow: hidden;
+      transition: background .2s ease, border-color .2s ease;
+    }
+    .id-card:hover:not(:disabled) {
+      background: var(--surface-hover);
+      border-color: rgba(255,255,255,.18);
+    }
+    .id-card:disabled { cursor: default; }
+    .tile-head {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 16px;
+      gap: 8px;
+      margin-bottom: 14px;
+      color: rgba(255,255,255,.39);
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0;
     }
-    .card-label { font-size: 14px; font-weight: 600; color: rgba(255,255,255,.7); }
-    .number {
-      position: relative;
-      z-index: 1;
+    .tile-label {
       display: flex;
-      justify-content: center;
-      margin: 16px 0;
-      font: 700 42px/1 var(--mono);
-      letter-spacing: .2em;
+      align-items: center;
+      gap: 7px;
+    }
+    .copy-dot {
+      width: 27px;
+      height: 27px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      background: rgba(255,255,255,.05);
+      color: rgba(255,255,255,.45);
+      transition: color .2s ease, background .2s ease;
+    }
+    .id-card:not(:disabled):hover .copy-dot { color: rgba(255,255,255,.9); }
+    .id-card.copied .copy-dot {
+      color: var(--green);
+      background: rgba(16,185,129,.18);
+    }
+    .number {
+      min-width: 0;
       color: #fff;
-      text-shadow: 0 2px 8px rgba(0,0,0,.35);
-      white-space: pre;
+      font: 500 30px/1.15 var(--mono);
+      white-space: nowrap;
+      letter-spacing: .12em;
       user-select: text;
     }
-    .number.empty { color: rgba(255,255,255,.26); letter-spacing: .12em; }
+    .number.empty { color: rgba(255,255,255,.28); }
     .caption {
-      position: relative;
-      z-index: 1;
-      text-align: center;
-      font-size: 11px;
-      color: rgba(255,255,255,.4);
-      margin-bottom: 20px;
+      margin-top: 10px;
+      color: rgba(255,255,255,.32);
+      font-size: 10px;
     }
-    .primary-btn {
+    .watermark {
+      position: absolute;
+      right: -14px;
+      bottom: -14px;
+      width: 82px;
+      height: 82px;
+      color: rgba(255,255,255,.045);
+    }
+    .metric-tile {
+      min-height: 125px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .metric-value {
+      min-width: 0;
+      color: rgba(255,255,255,.9);
+      font: 14px/1.3 var(--mono);
+      overflow-wrap: anywhere;
+      user-select: text;
+    }
+    .metric-note {
+      color: rgba(255,255,255,.38);
+      margin-top: 4px;
+      font-size: 10px;
+      line-height: 1.35;
+    }
+    .performance {
+      display: grid;
+      gap: 6px;
+    }
+    .performance-row {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .performance-row span:first-child {
+      color: rgba(255,255,255,.38);
+      font-size: 10px;
+    }
+    .performance-row strong {
+      color: rgba(255,255,255,.88);
+      font: 500 14px/1.2 var(--mono);
+    }
+    .performance-row .good { color: var(--green); }
+    .footer {
+      position: relative;
+      z-index: 2;
+      flex: 0 0 auto;
+      padding: 0 20px 17px;
+      display: grid;
+      gap: 8px;
+      background: var(--window);
+    }
+    .toggle-btn {
+      position: relative;
+      overflow: hidden;
+      width: 100%;
+      height: 55px;
+      border-radius: 16px;
+      border: 1px solid var(--line-soft);
+      background: rgba(255,255,255,.045);
+      color: var(--rose);
+      transition: background .5s ease, border-color .5s ease, color .5s ease, box-shadow .5s ease;
+    }
+    .toggle-btn:hover {
+      color: #fda4af;
+      background: rgba(244,63,94,.1);
+      border-color: rgba(244,63,94,.28);
+    }
+    .toggle-btn.stopped {
+      color: var(--green);
+      background: rgba(16,185,129,.1);
+      border-color: rgba(16,185,129,.3);
+    }
+    .toggle-btn.stopped:hover {
+      color: var(--green);
+      background: rgba(16,185,129,.2);
+      border-color: rgba(16,185,129,.6);
+      box-shadow: 0 0 25px rgba(16,185,129,.25);
+    }
+    .toggle-shine {
+      position: absolute;
+      z-index: 0;
+      top: 0;
+      left: -110%;
+      width: 50%;
+      height: 100%;
+      pointer-events: none;
+      opacity: 0;
+      transform: skewX(-12deg);
+      background: linear-gradient(90deg, transparent, rgba(52,211,153,.2));
+    }
+    .toggle-btn.stopped:hover .toggle-shine {
+      opacity: 1;
+      animation: shine 1.5s ease-in-out infinite;
+    }
+    .toggle-inner {
       position: relative;
       z-index: 1;
-      width: 100%;
-      border: 1px solid transparent;
-      border-radius: 8px;
-      min-height: 40px;
-      display: flex;
+      display: inline-flex;
       align-items: center;
       justify-content: center;
       gap: 8px;
-      background: #2563eb;
-      color: #fff;
       font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background .2s ease, border-color .2s ease, color .2s ease;
-      box-shadow: 0 10px 24px rgba(30,58,138,.2);
+      font-weight: 500;
+      letter-spacing: .08em;
     }
-    .primary-btn:hover { background: #3b82f6; }
-    .primary-btn.copied {
-      background: rgba(34,197,94,.2);
-      color: #4ade80;
-      border-color: rgba(34,197,94,.3);
-      box-shadow: none;
-    }
-    .primary-btn:disabled { cursor: not-allowed; background: rgba(255,255,255,.08); color: rgba(255,255,255,.35); box-shadow: none; }
-    .mini-note { position: relative; z-index: 1; text-align: center; color: rgba(255,255,255,.3); font-size: 10px; margin-top: 12px; }
-    .notice {
-      display: flex;
-      align-items: flex-start;
-      gap: 12px;
-      padding: 14px;
-      background: rgba(0,0,0,.2);
-      border: 1px solid rgba(255,255,255,.05);
-      border-radius: 12px;
-    }
-    .notice svg { width: 20px; height: 20px; color: var(--green); flex: 0 0 auto; margin-top: 2px; }
-    .notice strong { display: block; color: rgba(255,255,255,.8); font-size: 12px; font-weight: 600; margin-bottom: 4px; }
-    .notice span { display: block; color: rgba(255,255,255,.4); font-size: 12px; line-height: 1.45; }
-    .info-list { border-radius: 12px; }
-    .info-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 14px;
-      min-height: 48px;
-      border-bottom: 1px solid rgba(255,255,255,.05);
-      font-size: 14px;
-    }
-    .info-row:last-child { border-bottom: 0; }
-    .info-row .k { color: rgba(255,255,255,.6); }
-    .info-row .v { color: rgba(255,255,255,.9); font-family: var(--mono); text-align: right; user-select: text; }
-    .latency { display: flex; align-items: center; gap: 8px; }
-    .latency span { color: #4ade80; font-size: 12px; font-weight: 700; }
-    .bars { display: flex; gap: 4px; }
-    .bars i { width: 6px; height: 6px; border-radius: 999px; background: var(--green); box-shadow: 0 0 5px rgba(34,197,94,.5); }
-    .footer {
-      flex: 0 0 auto;
-      padding: 8px 16px 16px;
-      border-top: 1px solid rgba(255,255,255,.05);
-      background: rgba(28,28,30,.8);
-      backdrop-filter: blur(14px);
-    }
-    .toggle-btn {
-      width: 100%;
-      min-height: 44px;
-      border-radius: 12px;
-      border: 1px solid rgba(255,255,255,.05);
-      background: rgba(255,255,255,.05);
-      color: rgba(255,255,255,.8);
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: color .2s ease, background .2s ease, border-color .2s ease;
-      margin-bottom: 12px;
-    }
-    .toggle-btn:hover { background: rgba(239,68,68,.2); color: #f87171; border-color: rgba(239,68,68,.3); }
-    .toggle-btn.stopped { background: #2563eb; color: #fff; border-color: transparent; box-shadow: 0 10px 24px rgba(30,58,138,.2); }
-    .toggle-btn.stopped:hover { background: #3b82f6; color: #fff; }
+    .toggle-btn.stopped .power-icon { color: var(--green); }
     .detail-link {
+      height: 32px;
       width: 100%;
-      border: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      color: rgba(255,255,255,.3);
       background: transparent;
-      color: rgba(255,255,255,.5);
+      font: 11px/1 var(--mono);
+      text-transform: uppercase;
+      letter-spacing: 0;
+    }
+    .detail-link:hover { color: rgba(255,255,255,.78); }
+    .drawer {
+      position: absolute;
+      z-index: 50;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      background: var(--drawer);
+      transform: translateY(100%);
+      visibility: hidden;
+      transition: transform .42s cubic-bezier(.32,.72,0,1), visibility 0s linear .42s;
+    }
+    .drawer.show {
+      visibility: visible;
+      transform: translateY(0);
+      transition-delay: 0s;
+    }
+    .drawer-head {
+      height: 64px;
+      padding: 0 22px;
+      flex: 0 0 64px;
+      border-bottom: 1px solid var(--line-soft);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 6px 8px;
-      font-size: 12px;
-      cursor: pointer;
-      transition: color .2s ease;
+      -webkit-app-region: drag;
     }
-    .detail-link:hover { color: rgba(255,255,255,.9); }
-    .link-left { display: flex; align-items: center; gap: 8px; }
-    .detail-panel {
-      display: none;
+    .drawer-heading {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      color: rgba(255,255,255,.82);
+      font-size: 14px;
+      font-weight: 500;
     }
-    .detail-panel.show { display: block; }
-    .detail-body {
+    .drawer-heading .icon { color: var(--green-strong); }
+    .drawer-close {
+      width: 32px;
+      height: 32px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      color: rgba(255,255,255,.5);
+      background: rgba(255,255,255,.05);
+      -webkit-app-region: no-drag;
+    }
+    .drawer-close:hover { color: #fff; background: rgba(255,255,255,.1); }
+    .drawer-scroll {
+      min-height: 0;
+      flex: 1 1 auto;
+      padding: 22px;
+      overflow-y: auto;
       display: grid;
       align-content: start;
-      gap: 16px;
+      gap: 18px;
     }
     .overview {
-      background: rgba(255,255,255,.04);
-      border: 1px solid rgba(255,255,255,.08);
-      border-radius: 12px;
-      padding: 16px;
+      min-height: 72px;
+      padding: 15px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      border: 1px solid rgba(16,185,129,.22);
+      border-radius: 16px;
+      background: rgba(16,185,129,.055);
     }
-    .overview-line { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-    .small-dot { width: 10px; height: 10px; border-radius: 999px; background: var(--green); box-shadow: 0 0 8px rgba(34,197,94,.5); }
-    .small-dot.red { background: var(--red); box-shadow: 0 0 8px rgba(239,68,68,.5); }
-    .overview-title { color: rgba(255,255,255,.9); font-size: 14px; font-weight: 600; }
-    .overview-text { color: rgba(255,255,255,.4); font-size: 12px; margin-left: 18px; line-height: 1.5; }
+    .overview.offline {
+      border-color: rgba(244,63,94,.18);
+      background: rgba(244,63,94,.05);
+    }
+    .small-dot {
+      flex: 0 0 11px;
+      width: 11px;
+      height: 11px;
+      border-radius: 999px;
+      background: var(--green-strong);
+      box-shadow: 0 0 10px rgba(16,185,129,.78);
+    }
+    .overview.offline .small-dot {
+      background: #f43f5e;
+      box-shadow: 0 0 10px rgba(244,63,94,.74);
+    }
+    .overview-title {
+      color: rgba(255,255,255,.9);
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .overview-text {
+      margin-top: 4px;
+      color: rgba(255,255,255,.39);
+      font-size: 11px;
+      line-height: 1.45;
+    }
     .events-list {
-      background: rgba(255,255,255,.02);
-      border: 1px solid rgba(255,255,255,.06);
-      border-radius: 12px;
-      overflow: hidden;
+      display: grid;
+      gap: 7px;
+      font: 10px/1.45 var(--mono);
+      color: rgba(255,255,255,.48);
     }
     .event-row {
       display: grid;
-      grid-template-columns: 8px 70px 1fr;
-      gap: 14px;
+      grid-template-columns: 62px 1fr;
+      gap: 10px;
       align-items: start;
-      padding: 14px;
-      border-bottom: 1px solid rgba(255,255,255,.03);
-      min-height: 44px;
     }
-    .event-row:last-child { border-bottom: 0; }
-    .event-kind { width: 6px; height: 6px; border-radius: 999px; background: #3b82f6; margin-top: 5px; box-shadow: 0 0 5px rgba(59,130,246,.5); }
-    .event-kind.ok { background: var(--green); box-shadow: 0 0 5px rgba(34,197,94,.5); }
-    .event-time { color: rgba(255,255,255,.3); font: 11px/1.5 var(--mono); }
-    .event-text { color: rgba(255,255,255,.7); font-size: 12px; line-height: 1.45; }
+    .event-time { color: rgba(255,255,255,.28); }
+    .event-kind { color: var(--blue); margin-right: 5px; }
+    .event-kind.ok { color: var(--green); }
+    .fold {
+      border: 1px solid var(--line-soft);
+      border-radius: 16px;
+      background: rgba(255,255,255,.012);
+      overflow: hidden;
+    }
     .fold-btn {
       width: 100%;
-      border: 0;
-      background: transparent;
-      color: rgba(255,255,255,.4);
+      min-height: 48px;
+      padding: 0 15px;
+      background: rgba(255,255,255,.02);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 8px 4px;
-      margin-bottom: 4px;
-      cursor: pointer;
-      transition: color .2s ease;
+      color: rgba(255,255,255,.6);
     }
-    .fold-btn:hover { color: rgba(255,255,255,.7); }
-    .fold-title { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; }
-    .fold-title small { font-size: 10px; font-weight: 500; opacity: .7; }
-    .chev { transition: transform .25s ease; }
-    .fold.open .chev { transform: rotate(90deg); }
+    .fold-btn:hover { color: rgba(255,255,255,.9); }
+    .fold-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0;
+    }
+    .chevron { transition: transform .28s ease; }
+    .fold.open .chevron { transform: rotate(180deg); }
     .fold-content {
       display: grid;
       grid-template-rows: 0fr;
       opacity: 0;
       transition: grid-template-rows .28s ease, opacity .28s ease;
     }
-    .fold.open .fold-content { grid-template-rows: 1fr; opacity: 1; }
-    .fold-inner { overflow: hidden; }
-    .trouble-list {
-      background: rgba(255,255,255,.02);
-      border: 1px solid rgba(255,255,255,.05);
-      border-radius: 12px;
-      font-size: 13px;
-      margin: 4px 0 8px;
-      overflow: hidden;
+    .fold.open .fold-content {
+      grid-template-rows: 1fr;
+      opacity: 1;
     }
+    .fold-inner { min-height: 0; overflow: hidden; }
+    .trouble-list { padding: 2px 15px 12px; }
     .trouble-row {
+      min-height: 43px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 14px;
-      padding: 14px;
-      border-bottom: 1px solid rgba(255,255,255,.05);
+      border-bottom: 1px solid var(--line-soft);
     }
     .trouble-row:last-child { border-bottom: 0; }
-    .trouble-row .k { color: rgba(255,255,255,.4); flex: 0 0 auto; }
-    .trouble-row .v { color: rgba(255,255,255,.55); font-family: var(--mono); text-align: right; overflow-wrap: anywhere; }
-    .log-tools { display: flex; align-items: center; justify-content: space-between; margin: 8px 4px 12px; }
-    .log-count { color: rgba(255,255,255,.4); font-size: 11px; }
-    .tool-actions { display: flex; gap: 8px; }
-    .tool-actions button {
-      border: 1px solid rgba(255,255,255,.05);
-      background: rgba(255,255,255,.05);
-      color: rgba(255,255,255,.6);
-      border-radius: 6px;
-      padding: 6px 12px;
-      font-size: 11px;
-      cursor: pointer;
-    }
-    .tool-actions button:hover { background: rgba(255,255,255,.1); color: rgba(255,255,255,.9); }
-    .console {
-      background: #121212;
-      border: 1px solid rgba(255,255,255,.03);
-      border-radius: 12px;
-      padding: 16px;
-      overflow-x: auto;
-      box-shadow: inset 0 1px 8px rgba(0,0,0,.28);
-      color: rgba(255,255,255,.5);
-      font: 11px/1.7 var(--mono);
-      white-space: pre;
+    .trouble-row .k { color: rgba(255,255,255,.38); font-size: 12px; }
+    .trouble-row .v {
+      max-width: 63%;
+      color: rgba(255,255,255,.62);
+      text-align: right;
+      font: 11px/1.4 var(--mono);
+      overflow-wrap: anywhere;
       user-select: text;
-      min-height: 170px;
     }
-    .custom-scrollbar::-webkit-scrollbar, .content::-webkit-scrollbar, .detail-body::-webkit-scrollbar { width: 4px; height: 4px; }
-    .custom-scrollbar::-webkit-scrollbar-track, .content::-webkit-scrollbar-track, .detail-body::-webkit-scrollbar-track { background: transparent; }
-    .custom-scrollbar::-webkit-scrollbar-thumb, .content::-webkit-scrollbar-thumb, .detail-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,.1); border-radius: 4px; }
-    .custom-scrollbar::-webkit-scrollbar-thumb:hover, .content::-webkit-scrollbar-thumb:hover, .detail-body::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.2); }
-    svg.icon { width: 16px; height: 16px; stroke: currentColor; stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; flex: 0 0 auto; }
-    @keyframes ping {
-      75%, 100% { transform: scale(1.75); opacity: 0; }
+    .trouble-row .v.good { color: var(--green); }
+    .log-panel {
+      height: 280px;
+      display: flex;
+      flex-direction: column;
     }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(-6px); }
-      to { opacity: 1; transform: translateY(0); }
+    .log-tools {
+      flex: 0 0 37px;
+      padding: 0 14px;
+      border-block: 1px solid var(--line-soft);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(0,0,0,.19);
+    }
+    .log-count {
+      color: rgba(255,255,255,.3);
+      font: 10px/1 var(--mono);
+      text-transform: uppercase;
+    }
+    .tool-actions { display: flex; gap: 10px; }
+    .tool-actions button {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 0;
+      color: rgba(255,255,255,.42);
+      background: transparent;
+      font-size: 10px;
+    }
+    .tool-actions button:hover { color: #fff; }
+    .console {
+      flex: 1 1 auto;
+      min-height: 0;
+      margin: 0;
+      padding: 12px;
+      background: #050505;
+      color: rgba(255,255,255,.52);
+      overflow: auto;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      user-select: text;
+      font: 10px/1.85 var(--mono);
+    }
+    svg.icon {
+      width: 16px;
+      height: 16px;
+      flex: 0 0 auto;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    svg.small-icon { width: 12px; height: 12px; }
+    .custom-scrollbar::-webkit-scrollbar { width: 3px; height: 3px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,.15);
+      border-radius: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.3); }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    @keyframes shine {
+      to { left: 200%; }
+    }
+    @media (max-height: 700px) {
+      .dashboard { padding-top: 8px; }
+      .status-head { padding: 0 0 15px; }
+      .radar { width: 76px; height: 76px; }
+      .shield-core { width: 42px; height: 42px; }
+      .state-title { margin-top: 14px; font-size: 21px; }
+      .id-card { min-height: 110px; }
+      .metric-tile { min-height: 104px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: .01ms !important;
+        transition-duration: .01ms !important;
+      }
     }
   </style>
 </head>
 <body>
-  <div class="app-shell">
-    <div class="titlebar">
-      <div class="window-control-space"></div>
+  <div id="appShell" class="app-shell">
+    <header class="titlebar">
       <div class="app-title">PortNest</div>
-      <div class="title-spacer"></div>
-    </div>
+    </header>
 
-    <div id="updateBanner" class="update">
-      <div>
-        <div id="updateTitle" class="update-title">版本更新可用</div>
-        <div id="updateSub" class="update-sub">请立即升级到最新版本</div>
+    <aside id="updateBanner" class="update" aria-live="polite">
+      <div class="update-pill">
+        <div>
+          <div id="updateTitle" class="update-title">发现新版本</div>
+          <div id="updateSub" class="update-sub"></div>
+        </div>
+        <button id="updateBtn" class="update-action">
+          <i id="updateProgress" class="update-progress"></i>
+          <span id="updateBtnText">更新</span>
+        </button>
+        <button id="updateCloseBtn" class="update-close" aria-label="关闭更新提示">
+          <svg class="icon small-icon" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"></path></svg>
+        </button>
       </div>
-      <button id="updateBtn">立即下载</button>
-    </div>
+    </aside>
 
-    <main class="content custom-scrollbar">
-      <div class="stack">
-        <section class="status-head">
-          <div id="pulseWrap" class="pulse-wrap stopped">
-            <div class="ping"></div>
-            <div class="pulse-dot"></div>
+    <main class="dashboard custom-scrollbar">
+      <section class="status-head">
+        <div id="radar" class="radar">
+          <div class="radar-ring"></div>
+          <div class="radar-ring-inner"></div>
+          <div class="shield-core">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.68 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path></svg>
           </div>
-          <h1 id="stateTitle" class="state-title">服务已停止</h1>
-          <p id="stateSub" class="state-sub">未连接 · 点击下方按钮开启</p>
-        </section>
+        </div>
+        <h1 id="stateTitle" class="state-title">系统已离线</h1>
+        <p id="stateSub" class="state-sub">READY TO CONNECT</p>
+      </section>
 
-        <section class="card code-card">
-          <div class="card-row">
-            <span class="card-label">您的 PortNest 编号</span>
-          </div>
-          <div id="codeText" class="number empty">------</div>
-          <div id="codeCaption" class="caption">此编号专属于您 · 长期固定不变</div>
-          <button id="copyBtn" class="primary-btn" disabled>
-            <svg id="copyIcon" class="icon" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-            <span id="copyText">复制编号</span>
-          </button>
-          <div class="mini-note">提供给对方使用 · 如怀疑泄露可联系管理员更换</div>
-        </section>
-
-        <section class="notice">
-          <svg class="icon" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.68 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path><path d="m9 12 2 2 4-4"></path></svg>
-          <div>
-            <strong>服务运行正常 · 隐私保护中</strong>
-            <span>请保持软件运行，关闭后 PortNest 编号将失效。我们不会留存您的任何浏览数据。</span>
-          </div>
-        </section>
-
-        <section class="card info-list">
-          <div class="info-row">
-            <span class="k">当前网络 IP</span>
-            <span id="currentIp" class="v">--.--.--.--</span>
-          </div>
-          <div class="info-row">
-            <span class="k">出口位置</span>
-            <span id="exitLocation" class="v" style="font-family:var(--sans)">未知</span>
-          </div>
-          <div class="info-row">
-            <span class="k">服务器延迟</span>
-            <span id="latencyBlock" class="latency">
-              <span>-</span>
+      <section class="data-grid">
+        <button id="copyBtn" class="tile id-card" disabled>
+          <div class="tile-head">
+            <span>PortNest ID</span>
+            <span class="copy-dot">
+              <svg id="copyIcon" class="icon small-icon" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             </span>
           </div>
-        </section>
+          <span id="codeText" class="number empty">------</span>
+          <span id="codeCaption" class="caption">此编号专属于您 · 长期固定不变</span>
+          <svg class="icon watermark" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.68 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path></svg>
+        </button>
 
-        <section id="detailPanel" class="detail-panel">
-          <div class="detail-body">
-            <div class="overview">
-              <div class="overview-line">
-                <div id="overviewDot" class="small-dot red"></div>
-                <span id="overviewTitle" class="overview-title">服务已停止</span>
-              </div>
-              <div id="overviewText" class="overview-text">服务当前未在运行，请返回主页开启服务。</div>
-            </div>
-
-            <div id="eventsList" class="events-list"></div>
-
-            <div id="troubleFold" class="fold">
-              <button class="fold-btn" data-fold="troubleFold">
-                <span class="fold-title">排障信息</span>
-                <svg class="icon chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"></path></svg>
-              </button>
-              <div class="fold-content">
-                <div class="fold-inner">
-                  <div class="trouble-list">
-                    <div class="trouble-row"><span class="k">服务状态</span><span id="troubleStatus" class="v">离线</span></div>
-                    <div class="trouble-row"><span class="k">设备识别码</span><span id="machineId" class="v">-</span></div>
-                    <div class="trouble-row"><span class="k">本机端口</span><span id="localPort" class="v">1080</span></div>
-                    <div class="trouble-row"><span class="k">响应速度</span><span id="responseSpeed" class="v">-</span></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div id="logsFold" class="fold">
-              <button class="fold-btn" data-fold="logsFold">
-                <span class="fold-title">详细日志 <small>(排障用,内部记录最后 200 行)</small></span>
-                <svg class="icon chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"></path></svg>
-              </button>
-              <div class="fold-content">
-                <div class="fold-inner">
-                  <div class="log-tools">
-                    <span id="logCount" class="log-count">0 行</span>
-                    <div class="tool-actions">
-                      <button id="copyLogsBtn">复制全部</button>
-                      <button id="clearLogsBtn">清空显示</button>
-                    </div>
-                  </div>
-                  <pre id="logConsole" class="console custom-scrollbar"></pre>
-                </div>
-              </div>
-            </div>
+        <article class="tile metric-tile">
+          <div class="tile-head">
+            <span class="tile-label">
+              <svg class="icon small-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+              路由
+            </span>
           </div>
-        </section>
-      </div>
+          <div>
+            <div id="currentIp" class="metric-value">--.--.--.--</div>
+            <div id="exitLocation" class="metric-note">未连接</div>
+          </div>
+        </article>
+
+        <article class="tile metric-tile">
+          <div class="tile-head">
+            <span class="tile-label">
+              <svg class="icon small-icon" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"></rect><path d="M9 9h6v6H9zM9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"></path></svg>
+              性能
+            </span>
+          </div>
+          <div class="performance">
+            <div class="performance-row"><span>延迟</span><strong id="latencyValue">-</strong></div>
+            <div class="performance-row"><span>端口</span><strong id="localPortSummary">-</strong></div>
+          </div>
+        </article>
+      </section>
     </main>
 
     <footer class="footer">
-      <button id="toggleBtn" class="toggle-btn stopped">开启服务</button>
-      <button id="detailsBtn" class="detail-link">
-        <span class="link-left">
-          <svg class="icon" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
-          <span>查看运行详情</span>
+      <button id="toggleBtn" class="toggle-btn stopped">
+        <span class="toggle-shine"></span>
+        <span class="toggle-inner">
+          <svg class="icon power-icon" viewBox="0 0 24 24"><path d="M12 2v10"></path><path d="M18.4 6.6a9 9 0 1 1-12.77.04"></path></svg>
+          <span id="toggleText">一键启动</span>
         </span>
-        <svg id="detailsChevron" class="icon chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"></path></svg>
+      </button>
+      <button id="detailsBtn" class="detail-link">
+        <svg class="icon small-icon" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
+        <span>高级详情与日志</span>
       </button>
     </footer>
+
+    <section id="detailPanel" class="drawer" aria-label="系统运行详情">
+      <header class="drawer-head">
+        <div class="drawer-heading">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
+          <span>系统运行详情</span>
+        </div>
+        <button id="closeDetails" class="drawer-close" aria-label="关闭运行详情">
+          <svg class="icon" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"></path></svg>
+        </button>
+      </header>
+
+      <div class="drawer-scroll custom-scrollbar">
+        <div id="overview" class="overview offline">
+          <div class="small-dot"></div>
+          <div>
+            <div id="overviewTitle" class="overview-title">服务已中断</div>
+            <div id="overviewText" class="overview-text">请返回主界面重新启动服务。</div>
+          </div>
+        </div>
+
+        <div id="eventsList" class="events-list"></div>
+
+        <section id="troubleFold" class="fold">
+          <button class="fold-btn" data-fold="troubleFold">
+            <span class="fold-title">排障诊断信息</span>
+            <svg class="icon chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"></path></svg>
+          </button>
+          <div class="fold-content">
+            <div class="fold-inner">
+              <div class="trouble-list">
+                <div class="trouble-row"><span class="k">服务状态</span><span id="troubleStatus" class="v">离线</span></div>
+                <div class="trouble-row"><span class="k">设备识别码</span><span id="machineId" class="v">-</span></div>
+                <div class="trouble-row"><span class="k">本机端口</span><span id="localPort" class="v">1080</span></div>
+                <div class="trouble-row"><span class="k">响应速度</span><span id="responseSpeed" class="v">-</span></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="logsFold" class="fold">
+          <button class="fold-btn" data-fold="logsFold">
+            <span class="fold-title">实时运行日志</span>
+            <svg class="icon chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"></path></svg>
+          </button>
+          <div class="fold-content">
+            <div class="fold-inner log-panel">
+              <div class="log-tools">
+                <span id="logCount" class="log-count">0 Lines / 200 Limit</span>
+                <div class="tool-actions">
+                  <button id="copyLogsBtn">
+                    <svg class="icon small-icon" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                    复制全部
+                  </button>
+                  <button id="clearLogsBtn">清空</button>
+                </div>
+              </div>
+              <pre id="logConsole" class="console custom-scrollbar"></pre>
+            </div>
+          </div>
+        </section>
+      </div>
+    </section>
   </div>
 
   <script>
@@ -539,12 +852,10 @@
       code: '',
       machineId: '',
       localPort: 1080,
-      gateway: '',
       networkInfo: { ip: '', location: '', isp: '' },
       connectedAt: 0,
-      uptimeTimer: null,
-      events: [],
       logs: [],
+      events: [],
       updateState: '',
       probeState: 'idle',
     };
@@ -554,9 +865,10 @@
     }
 
     function fmtUptime(seconds) {
-      const m = Math.floor(seconds / 60);
+      const h = Math.floor(seconds / 3600);
+      const m = Math.floor((seconds % 3600) / 60);
       const s = seconds % 60;
-      return `${m} 分 ${s} 秒`;
+      return h > 0 ? `${h}h ${m}m ${s}s` : `${m} 分 ${s} 秒`;
     }
 
     function formatCode(code) {
@@ -565,45 +877,48 @@
       return clean.length === 6 ? `${clean.slice(0, 3)} ${clean.slice(3)}` : clean;
     }
 
+    function isActive() {
+      return state.running && ['connecting', 'reconnecting', 'connected'].includes(state.status);
+    }
+
     function updateRuntimeText() {
-      if (state.running && state.status === 'connected') {
+      if (state.status === 'connected' && state.running) {
         const seconds = Math.max(0, Math.floor((Date.now() - state.connectedAt) / 1000));
-        $('stateSub').textContent = `已就绪 · 稳定运行 · ${fmtUptime(seconds)}`;
+        $('stateSub').textContent = `UPTIME / ${fmtUptime(seconds)}`;
       }
     }
 
     function renderStatus() {
-      const active = state.running && ['connecting', 'reconnecting', 'connected'].includes(state.status);
-      $('pulseWrap').className = `pulse-wrap ${active ? 'running' : 'stopped'}`;
-      $('toggleBtn').className = `toggle-btn ${active ? '' : 'stopped'}`;
-      $('toggleBtn').textContent = active ? '停止使用' : '开启服务';
+      const active = isActive();
+      const connected = state.status === 'connected';
+      $('appShell').classList.toggle('online', active);
+      $('radar').classList.toggle('online', active);
+      $('stateTitle').classList.toggle('online', active);
+      $('toggleBtn').classList.toggle('stopped', !active);
+      $('toggleText').textContent = active ? '断开连接' : '一键启动';
       $('troubleStatus').textContent = active ? '在线' : '离线';
-      $('overviewDot').className = `small-dot ${active ? '' : 'red'}`;
+      $('troubleStatus').classList.toggle('good', active);
+      $('overview').classList.toggle('offline', !active);
+      $('localPortSummary').textContent = active ? String(state.localPort || 1080) : '-';
+      $('latencyValue').classList.toggle('good', active);
+      $('latencyValue').textContent = active ? (connected ? '44ms' : '检测中') : '-';
+      $('responseSpeed').textContent = active ? (connected ? '44ms' : '检测中') : '-';
 
-      if (state.status === 'connected') {
-        $('stateTitle').textContent = '服务运行中';
-        $('overviewTitle').textContent = '当前状态正常';
-        $('overviewText').textContent = '服务端已可回连本机，PortNest 编号可以正常使用。';
+      if (connected) {
+        $('stateTitle').textContent = '系统已在线';
+        $('overviewTitle').textContent = '隧道连接稳定';
+        $('overviewText').textContent = '所有流量已被安全加密并转发至边缘节点。';
         updateRuntimeText();
       } else if (state.status === 'connecting' || state.status === 'reconnecting') {
-        $('stateTitle').textContent = state.status === 'reconnecting' ? '服务重连中' : '服务连接中';
-        $('stateSub').textContent = state.statusMessage || '正在建立连接';
-        $('overviewTitle').textContent = '正在连接服务';
-        $('overviewText').textContent = state.statusMessage || '正在分配编号并建立反向隧道。';
+        $('stateTitle').textContent = state.status === 'reconnecting' ? '系统重连中' : '系统连接中';
+        $('stateSub').textContent = state.statusMessage || 'CONNECTING';
+        $('overviewTitle').textContent = '正在建立隧道连接';
+        $('overviewText').textContent = state.statusMessage || '正在分配编号并连接边缘节点。';
       } else {
-        $('stateTitle').textContent = '服务已停止';
-        $('stateSub').textContent = '未连接 · 点击下方按钮开启';
-        $('overviewTitle').textContent = '服务已停止';
-        $('overviewText').textContent = '服务当前未在运行，请返回主页开启服务。';
-      }
-
-      const latency = $('latencyBlock');
-      if (active) {
-        latency.innerHTML = '<span>极佳</span><div class="bars"><i></i><i></i><i></i><i></i></div>';
-        $('responseSpeed').textContent = state.status === 'connected' ? '44 毫秒' : '检测中';
-      } else {
-        latency.innerHTML = '<span style="color:rgba(255,255,255,.4)">-</span>';
-        $('responseSpeed').textContent = '-';
+        $('stateTitle').textContent = '系统已离线';
+        $('stateSub').textContent = 'READY TO CONNECT';
+        $('overviewTitle').textContent = '服务已中断';
+        $('overviewText').textContent = '请返回主界面重新启动服务。';
       }
     }
 
@@ -617,33 +932,26 @@
       state.code = payload.code || '';
       state.machineId = payload.machineId || state.machineId;
       state.localPort = payload.local_socks_port || state.localPort;
-      state.gateway = payload.gatewayHost ? `${payload.gatewayHost}:${payload.gatewayPort || 1080}` : state.gateway;
       $('machineId').textContent = state.machineId || '-';
       $('localPort').textContent = String(state.localPort || 1080);
       renderCode();
-      renderNetworkInfo();
+      renderStatus();
     }
 
     function renderNetworkInfo() {
       const info = state.networkInfo || {};
-      $('currentIp').textContent = info.ip || '--.--.--.--';
+      $('currentIp').textContent = isActive() ? (info.ip || '查询中') : '--.--.--.--';
       const place = [info.location, info.isp].filter(Boolean).join(' · ');
-      $('exitLocation').textContent = place || '查询中';
+      $('exitLocation').textContent = isActive() ? (place || '查询中') : '未连接';
     }
 
     function renderEvents(items) {
       state.events = Array.isArray(items) ? items : [];
-      const fallback = [
-        { ts: Date.now(), level: state.running ? 'success' : 'info', text: state.running ? '已就绪 · 服务运行中' : '等待启动服务' },
-      ];
-      const rows = (state.events.length ? state.events : fallback).slice(0, 8);
+      const fallback = [{ ts: Date.now(), level: isActive() ? 'success' : 'info', text: isActive() ? '服务运行中' : '等待启动服务' }];
+      const rows = (state.events.length ? state.events : fallback).slice(-5);
       $('eventsList').innerHTML = rows.map((item) => {
         const ok = ['ok', 'success'].includes(item.level);
-        return `<div class="event-row">
-          <div class="event-kind ${ok ? 'ok' : ''}"></div>
-          <span class="event-time">${fmtTime(item.ts)}</span>
-          <span class="event-text">${escapeHtml(item.text)}</span>
-        </div>`;
+        return `<div class="event-row"><span class="event-time">${fmtTime(item.ts)}</span><span><b class="event-kind ${ok ? 'ok' : ''}">[${ok ? 'success' : 'event'}]</b>${escapeHtml(item.text)}</span></div>`;
       }).join('');
     }
 
@@ -654,7 +962,7 @@
     }
 
     function renderLogs() {
-      $('logCount').textContent = `${state.logs.length} 行`;
+      $('logCount').textContent = `${state.logs.length} Lines / 200 Limit`;
       $('logConsole').textContent = state.logs.join('\n');
       $('logConsole').scrollTop = $('logConsole').scrollHeight;
     }
@@ -667,10 +975,18 @@
 
     function setCopiedUI(copied) {
       $('copyBtn').classList.toggle('copied', copied);
-      $('copyText').textContent = copied ? '已复制编号' : '复制编号';
       $('copyIcon').innerHTML = copied
         ? '<path d="M20 6 9 17l-5-5"></path>'
-        : '<rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>';
+        : '<rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2 2v1"></path>';
+    }
+
+    function showUpdate(stateName, title, buttonLabel, disabled, percent) {
+      $('updateTitle').textContent = title;
+      $('updateBtnText').textContent = buttonLabel;
+      $('updateBtn').disabled = !!disabled;
+      $('updateBtn').classList.toggle('done', stateName === 'downloaded');
+      $('updateProgress').style.width = `${percent || 0}%`;
+      $('updateBanner').classList.add('show');
     }
 
     window.api.on('status', (payload) => {
@@ -681,57 +997,35 @@
       if (state.status === 'connected' && prev !== 'connected') state.connectedAt = Date.now();
       if (state.status !== 'connected') state.connectedAt = Date.now();
       renderStatus();
+      renderNetworkInfo();
+      renderEvents(state.events);
     });
-
     window.api.on('config', renderConfig);
     window.api.on('events', renderEvents);
     window.api.on('detailLog', addLog);
-    window.api.on('probeStatus', (payload) => {
-      state.probeState = payload?.state || 'idle';
-      if (state.probeState === 'ok') $('codeCaption').textContent = '此编号专属于您 · 服务端已验证';
-      else if (state.probeState === 'pending') $('codeCaption').textContent = '此编号专属于您 · 服务端验证中';
-      else if (state.probeState === 'failed') $('codeCaption').textContent = '此编号专属于您 · 验证暂未通过';
-      else $('codeCaption').textContent = '此编号专属于您 · 长期固定不变';
-    });
-    window.api.on('metrics', (payload) => {
-      renderNetworkInfo();
-    });
     window.api.on('networkInfo', (payload) => {
       state.networkInfo = payload || {};
       renderNetworkInfo();
     });
+    window.api.on('probeStatus', (payload) => {
+      state.probeState = payload?.state || 'idle';
+      if (state.probeState === 'ok') $('codeCaption').textContent = '点击复制 · 服务端已验证';
+      else if (state.probeState === 'pending') $('codeCaption').textContent = '点击复制 · 服务端验证中';
+      else if (state.probeState === 'failed') $('codeCaption').textContent = '点击复制 · 验证暂未通过';
+      else $('codeCaption').textContent = '此编号专属于您 · 长期固定不变';
+    });
     window.api.on('update-available', (payload) => {
       state.updateState = 'available';
-      $('updateTitle').textContent = `版本 ${payload?.currentVersion || ''} 可升级`;
-      $('updateSub').textContent = `请立即升级到最新版本 ${payload?.version || ''}`;
-      $('updateBtn').textContent = '下载更新';
-      $('updateBtn').disabled = false;
-      $('updateBanner').classList.add('show');
+      showUpdate('available', `发现新版本 ${payload?.version || ''}`, '更新', false, 0);
     });
     window.api.on('update', (payload) => {
       state.updateState = payload?.state || '';
-      if (state.updateState === 'checking') {
-        $('updateTitle').textContent = '正在检查更新';
-        $('updateSub').textContent = '请稍候';
-        $('updateBtn').textContent = '检查中';
-        $('updateBtn').disabled = true;
-      } else if (state.updateState === 'downloading') {
-        $('updateTitle').textContent = '正在下载更新';
-        $('updateSub').textContent = `下载进度 ${payload?.percent || 0}%`;
-        $('updateBtn').textContent = `${payload?.percent || 0}%`;
-        $('updateBtn').disabled = true;
+      if (state.updateState === 'downloading') {
+        showUpdate('downloading', `正在下载 ${payload?.version || '新版本'}`, `${payload?.percent || 0}%`, true, payload?.percent || 0);
       } else if (state.updateState === 'downloaded') {
-        $('updateTitle').textContent = `新版本 ${payload?.version || ''} 已下载`;
-        $('updateSub').textContent = '点击安装并重启 PortNest';
-        $('updateBtn').textContent = '安装更新';
-        $('updateBtn').disabled = false;
-        $('updateBanner').classList.add('show');
+        showUpdate('downloaded', `新版 ${payload?.version || ''} 就绪`, '重启', false, 100);
       } else if (state.updateState === 'error') {
-        $('updateTitle').textContent = '更新检查失败';
-        $('updateSub').textContent = payload?.message || '请稍后重试';
-        $('updateBtn').textContent = '重试';
-        $('updateBtn').disabled = false;
-        $('updateBanner').classList.add('show');
+        showUpdate('error', '更新检查失败', '重试', false, 0);
       }
     });
 
@@ -747,61 +1041,52 @@
         $('toggleBtn').disabled = false;
       }
     });
-
     $('copyBtn').addEventListener('click', async () => {
       if (!state.code) return;
       await window.api.copy(String(state.code).replace(/\s/g, ''));
       setCopiedUI(true);
       setTimeout(() => setCopiedUI(false), 2000);
     });
-
-    $('detailsBtn').addEventListener('click', () => {
-      const visible = $('detailPanel').classList.toggle('show');
-      $('detailsChevron').style.transform = visible ? 'rotate(90deg)' : '';
-      if (visible) $('detailPanel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    });
-    document.querySelectorAll('[data-fold]').forEach((btn) => {
-      btn.addEventListener('click', () => $(btn.dataset.fold).classList.toggle('open'));
+    $('detailsBtn').addEventListener('click', () => $('detailPanel').classList.add('show'));
+    $('closeDetails').addEventListener('click', () => $('detailPanel').classList.remove('show'));
+    document.querySelectorAll('[data-fold]').forEach((button) => {
+      button.addEventListener('click', () => $(button.dataset.fold).classList.toggle('open'));
     });
     $('copyLogsBtn').addEventListener('click', () => window.api.copy(state.logs.join('\n')));
     $('clearLogsBtn').addEventListener('click', () => {
       state.logs = [];
       renderLogs();
     });
+    $('updateCloseBtn').addEventListener('click', () => $('updateBanner').classList.remove('show'));
     $('updateBtn').addEventListener('click', () => {
-      if (state.updateState === 'downloaded') {
-        window.api.installUpdate();
-      } else if (state.updateState === 'error') {
-        window.api.checkForUpdates();
-      } else {
-        window.api.downloadUpdate();
-      }
+      if (state.updateState === 'downloaded') window.api.installUpdate();
+      else if (state.updateState === 'error') window.api.checkForUpdates();
+      else window.api.downloadUpdate();
     });
 
     window.api.getState().then((snapshot) => {
       state.running = !!snapshot.running;
       state.machineId = snapshot.machineId || '';
       state.localPort = snapshot.localSocksPort || 1080;
+      state.networkInfo = snapshot.networkInfo || state.networkInfo;
       $('machineId').textContent = state.machineId || '-';
       $('localPort').textContent = String(state.localPort || 1080);
-      state.networkInfo = snapshot.networkInfo || state.networkInfo;
-      renderNetworkInfo();
       renderStatus();
+      renderNetworkInfo();
     });
     window.api.getNetworkInfo().then((info) => {
       state.networkInfo = info || {};
       renderNetworkInfo();
-    }).catch(() => {
-      renderNetworkInfo();
-    });
+    }).catch(renderNetworkInfo);
     window.api.getEvents().then(renderEvents);
     window.api.getDetailLog().then((items) => {
       (items || []).forEach(addLog);
       renderLogs();
     });
-    state.uptimeTimer = setInterval(updateRuntimeText, 1000);
+    setInterval(updateRuntimeText, 1000);
     renderStatus();
     renderCode();
+    renderNetworkInfo();
     renderEvents([]);
   </script>
 </body>
