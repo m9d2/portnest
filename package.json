@@ -7,7 +7,7 @@
   "private": true,
   "scripts": {
     "start": "tauri dev",
-    "check": "node --check src/renderer/tauri-bridge.js && node --check scripts/prepare-tauri-sidecars.js && node --check scripts/release-version.js && node --check scripts/write-runtime-config.js",
+    "check": "node --check src/renderer/tauri-bridge.js && node --check scripts/prepare-tauri-sidecars.js && node --check scripts/release-version.js && node --check scripts/write-runtime-config.js && node --check scripts/merge-tauri-latest.js",
     "release": "node scripts/release-version.js",
     "tauri": "tauri",
     "tauri:prepare": "node scripts/prepare-tauri-sidecars.js",

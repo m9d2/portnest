@@ -1,11 +1,43 @@
+# Dependencies
 node_modules/
+
+# Build output
 dist/
+
+# Runtime config (use runtime-config.example.json as template)
 runtime-config.json
+
+# Logs
 *.log
+npm-debug.log*
+
+# OS
 .DS_Store
-server/
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Tauri
 .tauri/
 src-tauri/target/
 src-tauri/gen/schemas/
 src-tauri/binaries/*
 !src-tauri/binaries/.gitkeep
+
+# Server (separate project)
+server/
+
+# Sidecar binaries
+bin/*
+!bin/.gitkeep
+!bin/darwin-arm64/.gitkeep
+
+# Env files
+.env
+.env.local
+.env.*.local

@@ -10,11 +10,27 @@ permissions:
 
 jobs:
   build:
-    name: Build macOS and Windows
+    name: Build ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest]
+        include:
+          - name: macOS arm64
+            os: macos-latest
+            target: aarch64-apple-darwin
+            args: --target aarch64-apple-darwin
+            latest: latest-darwin-aarch64.json
+          - name: macOS x64
+            os: macos-13
+            target: x86_64-apple-darwin
+            args: --target x86_64-apple-darwin
+            latest: latest-darwin-x86_64.json
+          - name: Windows x64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+            args: --target x86_64-pc-windows-msvc
+            latest: latest-windows-x86_64.json
 
     steps:
       - uses: actions/checkout@v4
@@ -23,6 +39,10 @@ jobs:
         with:
           node-version: 20
           cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
 
       - run: npm ci --registry=https://registry.npmjs.org --foreground-scripts
 
@@ -34,21 +54,34 @@ jobs:
           APP_BRAND: portnest
           LOCAL_SOCKS_HINT: "1080"
 
-      - name: Build
+      - name: Build Tauri app
+        run: npm run tauri:build -- ${{ matrix.args }}
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+      - name: Prepare upload artifacts
         shell: bash
         run: |
-          echo "Runner OS: $RUNNER_OS"
-          if [ "$RUNNER_OS" == "macOS" ]; then
-            npm run dist:mac -- --publish never
-          elif [ "$RUNNER_OS" == "Windows" ]; then
-            npm run dist:win -- --publish never
+          mkdir -p upload
+          find src-tauri/target -path '*/bundle/dmg/*.dmg' -exec cp {} upload/ \;
+          app_tar="$(find src-tauri/target -path '*/bundle/macos/*.app.tar.gz' -print -quit)"
+          if [ -n "$app_tar" ]; then
+            cp "$app_tar" "upload/PortNest_${{ github.ref_name }}_${{ matrix.target }}.app.tar.gz"
+            cp "$app_tar.sig" "upload/PortNest_${{ github.ref_name }}_${{ matrix.target }}.app.tar.gz.sig"
+          fi
+          exe="$(find src-tauri/target -path '*/bundle/nsis/*.exe' -print -quit)"
+          if [ -n "$exe" ]; then
+            cp "$exe" "upload/PortNest_${{ github.ref_name }}_${{ matrix.target }}.exe"
+            cp "$exe.sig" "upload/PortNest_${{ github.ref_name }}_${{ matrix.target }}.exe.sig"
           fi
 
-      - name: Upload artifacts
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.os }}-build
-          path: dist/
+          name: ${{ matrix.name }}
+          path: |
+            upload/*
 
   publish:
     name: Publish Release
@@ -57,17 +90,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download macOS build
+      - name: Download builds
         uses: actions/download-artifact@v4
         with:
-          name: macos-latest-build
-          path: dist/mac
+          path: dist
+          merge-multiple: true
 
-      - name: Download Windows build
-        uses: actions/download-artifact@v4
-        with:
-          name: windows-latest-build
-          path: dist/win
+      - name: Merge updater manifests
+        run: node scripts/merge-tauri-latest.js dist "${{ github.ref_name }}" m9d2/portnest
 
       - name: Publish Release with assets
         uses: softprops/action-gh-release@v2
@@ -77,12 +107,11 @@ jobs:
           prerelease: false
           fail_on_unmatched_files: true
           files: |
-            dist/mac/*.dmg
-            dist/mac/*.zip
-            dist/mac/*.blockmap
-            dist/mac/latest-mac.yml
-            dist/win/*.exe
-            dist/win/*.blockmap
-            dist/win/latest.yml
+            dist/**/*.dmg
+            dist/**/*.app.tar.gz
+            dist/**/*.app.tar.gz.sig
+            dist/**/*.exe
+            dist/**/*.exe.sig
+            dist/latest.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,6 +1,6 @@
 [package]
 name = "portnest"
-version = "1.0.6"
+version = "1.1.0"
 description = "PortNest Tauri migration client"
 authors = []
 edition = "2021"
@@ -20,6 +20,7 @@ serde_json = "1"
 sha2 = "0.10"
 tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-shell = "2"
+tauri-plugin-single-instance = "2"
 tauri-plugin-updater = "2"
 tokio = { version = "1", features = ["net", "time"] }
 url = "2"

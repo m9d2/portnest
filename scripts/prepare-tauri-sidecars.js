@@ -27,7 +27,8 @@ for (const [fromRelative, toName] of binaries) {
     copied++;
   }
   if (process.platform !== 'win32' && !to.endsWith('.exe')) {
-    fs.chmodSync(to, 0o755);
+    const executable = (fs.statSync(to).mode & 0o111) !== 0;
+    if (!executable) fs.chmodSync(to, 0o755);
   }
 }
 
