@@ -1,7 +1,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use ed25519_dalek::{Signer, SigningKey};
 use hmac::{Hmac, Mac};
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
+use rand_core::OsRng;
 use reqwest::{Client, Method};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -84,7 +86,8 @@ struct ClientState {
     config: RuntimeConfig,
     data_dir: PathBuf,
     machine_id: String,
-    device_secret: String,
+    device_private_key: String,
+    device_public_key: String,
     clock_skew_ms: i64,
     local_socks_port: u16,
     current_dispatcher_url: String,
@@ -115,7 +118,8 @@ impl RuntimeState {
                 config: RuntimeConfig::default(),
                 data_dir: PathBuf::new(),
                 machine_id: String::new(),
-                device_secret: String::new(),
+                device_private_key: String::new(),
+                device_public_key: String::new(),
                 clock_skew_ms: 0,
                 local_socks_port: 1080,
                 current_dispatcher_url: "http://127.0.0.1:8422".into(),
@@ -173,8 +177,6 @@ struct Assignment {
     gateway_host: String,
     #[serde(default = "default_gateway_port")]
     gateway_port: u16,
-    #[serde(default)]
-    device_secret: String,
     #[serde(default)]
     assist_count: u64,
     #[serde(default = "default_true")]
@@ -274,8 +276,8 @@ fn redact(app: &AppHandle, input: &str) -> String {
             }
         }
     }
-    if !data.device_secret.is_empty() {
-        text = text.replace(&data.device_secret, "[SECRET]");
+    if !data.device_private_key.is_empty() {
+        text = text.replace(&data.device_private_key, "[PRIVATE_KEY]");
     }
     if !data.machine_id.is_empty() {
         text = text.replace(
@@ -387,8 +389,32 @@ fn load_text(path: &Path) -> String {
         .to_string()
 }
 
-fn valid_device_secret(value: &str) -> bool {
+fn valid_machine_id(value: &str) -> bool {
+    (8..=80).contains(&value.len())
+        && value
+            .chars()
+            .all(|char| char.is_ascii_alphanumeric() || char == '-' || char == '_')
+}
+
+fn valid_device_private_key(value: &str) -> bool {
     value.len() == 64 && value.chars().all(|char| char.is_ascii_hexdigit())
+}
+
+fn device_keypair(private_key_text: &str) -> Option<(String, String)> {
+    let bytes: [u8; 32] = hex::decode(private_key_text).ok()?.try_into().ok()?;
+    let signing_key = SigningKey::from_bytes(&bytes);
+    Some((
+        hex::encode(signing_key.to_bytes()),
+        hex::encode(signing_key.verifying_key().to_bytes()),
+    ))
+}
+
+fn generate_device_keypair() -> (String, String) {
+    let signing_key = SigningKey::generate(&mut OsRng);
+    (
+        hex::encode(signing_key.to_bytes()),
+        hex::encode(signing_key.verifying_key().to_bytes()),
+    )
 }
 
 fn save_private(path: &Path, value: &str) {
@@ -403,6 +429,14 @@ fn save_private(path: &Path, value: &str) {
     }
 }
 
+fn machine_id_from_ioreg(text: &str) -> Option<String> {
+    text.lines()
+        .find(|line| line.contains("\"IOPlatformUUID\""))
+        .and_then(|line| line.split('"').nth(3))
+        .filter(|value| valid_machine_id(value))
+        .map(str::to_lowercase)
+}
+
 fn derive_machine_id() -> String {
     #[cfg(target_os = "macos")]
     {
@@ -411,12 +445,8 @@ fn derive_machine_id() -> String {
             .output()
         {
             let text = String::from_utf8_lossy(&output.stdout);
-            if let Some(pos) = text.find("IOPlatformUUID") {
-                let tail = &text[pos..];
-                let parts: Vec<&str> = tail.split('"').collect();
-                if parts.len() > 3 && !parts[3].is_empty() {
-                    return parts[3].to_lowercase();
-                }
+            if let Some(value) = machine_id_from_ioreg(&text) {
+                return value;
             }
         }
     }
@@ -427,20 +457,22 @@ fn initialize_runtime(app: &AppHandle) {
     let config = read_runtime_config(app);
     let data_dir = legacy_data_dir(app);
     let machine_path = data_dir.join("machine_id");
-    let secret_path = data_dir.join("device_secret");
+    let private_key_path = data_dir.join("device_private_key");
     let stored_machine = load_text(&machine_path);
-    let machine_id = if (8..=64).contains(&stored_machine.len()) {
+    let machine_id = if valid_machine_id(&stored_machine) {
         stored_machine
     } else {
         let value = derive_machine_id();
         save_private(&machine_path, &value);
         value
     };
-    let stored_secret = load_text(&secret_path);
-    let device_secret = if valid_device_secret(&stored_secret) {
-        stored_secret
+    let stored_private_key = load_text(&private_key_path);
+    let (device_private_key, device_public_key) = if valid_device_private_key(&stored_private_key) {
+        device_keypair(&stored_private_key).unwrap_or_else(generate_device_keypair)
     } else {
-        String::new()
+        let keypair = generate_device_keypair();
+        save_private(&private_key_path, &keypair.0);
+        keypair
     };
     let dispatcher = config
         .dispatcher_list()
@@ -454,7 +486,13 @@ fn initialize_runtime(app: &AppHandle) {
     data.config = config;
     data.data_dir = data_dir;
     data.machine_id = machine_id;
-    data.device_secret = device_secret;
+    data.device_private_key = device_private_key;
+    data.device_public_key = device_public_key;
+}
+
+enum RequestAuth {
+    Bootstrap(String),
+    Device(String),
 }
 
 async fn signed_request(
@@ -462,7 +500,7 @@ async fn signed_request(
     method: Method,
     url: &str,
     body: Option<Value>,
-    secret: &str,
+    auth: &RequestAuth,
 ) -> Result<Value, ApiError> {
     let parsed = Url::parse(url).map_err(|error| ApiError::new(error.to_string()))?;
     let body_text = body.as_ref().map(Value::to_string).unwrap_or_default();
@@ -484,10 +522,22 @@ async fn signed_request(
         parsed.path(),
         body_text
     );
-    let mut mac = Hmac::<Sha256>::new_from_slice(secret.as_bytes())
-        .map_err(|_| ApiError::new("签名密钥无效"))?;
-    mac.update(signature_text.as_bytes());
-    let signature = hex::encode(mac.finalize().into_bytes());
+    let signature = match auth {
+        RequestAuth::Bootstrap(secret) => {
+            let mut mac = Hmac::<Sha256>::new_from_slice(secret.as_bytes())
+                .map_err(|_| ApiError::new("签名密钥无效"))?;
+            mac.update(signature_text.as_bytes());
+            hex::encode(mac.finalize().into_bytes())
+        }
+        RequestAuth::Device(private_key) => {
+            let bytes: [u8; 32] = hex::decode(private_key)
+                .map_err(|_| ApiError::new("设备私钥无效"))?
+                .try_into()
+                .map_err(|_| ApiError::new("设备私钥无效"))?;
+            let signing_key = SigningKey::from_bytes(&bytes);
+            hex::encode(signing_key.sign(signature_text.as_bytes()).to_bytes())
+        }
+    };
     let state = runtime(app);
     let mut request = state
         .http
@@ -544,13 +594,13 @@ async fn http_json(
     body: Option<Value>,
     device_scoped: bool,
 ) -> Result<Value, ApiError> {
-    let (targets, secret) = {
+    let (targets, auth) = {
         let state = runtime(app);
         let data = state.data.lock().expect("runtime mutex poisoned");
-        let secret = if device_scoped && !data.device_secret.is_empty() {
-            data.device_secret.clone()
+        let auth = if device_scoped {
+            RequestAuth::Device(data.device_private_key.clone())
         } else {
-            data.config.client_secret.clone()
+            RequestAuth::Bootstrap(data.config.client_secret.clone())
         };
         let targets = if path.starts_with("http://") || path.starts_with("https://") {
             vec![path.into()]
@@ -561,16 +611,16 @@ async fn http_json(
                 .map(|base| format!("{}{}", base.trim_end_matches('/'), path))
                 .collect()
         };
-        (targets, secret)
+        (targets, auth)
     };
-    if secret.is_empty() {
+    if matches!(&auth, RequestAuth::Bootstrap(secret) if secret.is_empty()) {
         return Err(ApiError::new(
             "缺少 CLIENT_SECRET，请配置 runtime-config.json",
         ));
     }
     let mut errors = Vec::new();
     for target in targets {
-        match signed_request(app, method.clone(), &target, body.clone(), &secret).await {
+        match signed_request(app, method.clone(), &target, body.clone(), &auth).await {
             Ok(result) => {
                 if let Ok(url) = Url::parse(&target) {
                     let state = runtime(app);
@@ -580,15 +630,6 @@ async fn http_json(
                 return Ok(result);
             }
             Err(error) => {
-                if device_scoped && error.status == Some(403) {
-                    let secret_file = {
-                        let state = runtime(app);
-                        let mut data = state.data.lock().expect("runtime mutex poisoned");
-                        data.device_secret.clear();
-                        data.data_dir.join("device_secret")
-                    };
-                    let _ = fs::remove_file(secret_file);
-                }
                 log_detail(
                     app,
                     "http",
@@ -642,11 +683,12 @@ fn backoff_delay(restarts: usize) -> Duration {
 }
 
 async fn register_with_dispatcher(app: &AppHandle) -> Result<Assignment, ApiError> {
-    let (machine_id, config, dispatcher) = {
+    let (machine_id, public_key, config, dispatcher) = {
         let state = runtime(app);
         let data = state.data.lock().expect("runtime mutex poisoned");
         (
             data.machine_id.clone(),
+            data.device_public_key.clone(),
             data.config.clone(),
             data.current_dispatcher_url.clone(),
         )
@@ -654,30 +696,28 @@ async fn register_with_dispatcher(app: &AppHandle) -> Result<Assignment, ApiErro
     set_status(app, "connecting", "正在分配编号");
     send_progress(app, 1, "register");
     log_detail(app, "reg", format!("POST /register via {}", dispatcher));
-    let result = http_json(
-        app,
-        Method::POST,
-        "/register",
-        Some(json!({
-            "machine_id": machine_id,
-            "app_version": APP_VERSION,
-            "app_brand": config.app_brand,
-            "os_platform": node_platform(),
-            "os_arch": node_arch(),
-            "hostname": hostname::get().unwrap_or_default().to_string_lossy()
-        })),
-        false,
-    )
-    .await?;
+    let body = json!({
+        "machine_id": machine_id,
+        "public_key": public_key,
+        "app_version": APP_VERSION,
+        "app_brand": config.app_brand,
+        "os_platform": node_platform(),
+        "os_arch": node_arch(),
+        "hostname": hostname::get().unwrap_or_default().to_string_lossy()
+    });
+    let result = match http_json(app, Method::POST, "/register", Some(body.clone()), true).await {
+        Ok(result) => result,
+        Err(error) if error.status == Some(403) => {
+            log_detail(app, "reg", "设备公钥尚未绑定，使用引导密钥注册");
+            http_json(app, Method::POST, "/register", Some(body), false).await?
+        }
+        Err(error) => return Err(error),
+    };
     let assignment: Assignment =
         serde_json::from_value(result).map_err(|error| ApiError::new(error.to_string()))?;
     let (local_port, machine_id) = {
         let state = runtime(app);
         let mut data = state.data.lock().expect("runtime mutex poisoned");
-        if valid_device_secret(&assignment.device_secret) {
-            data.device_secret = assignment.device_secret.clone();
-            save_private(&data.data_dir.join("device_secret"), &data.device_secret);
-        }
         data.assist_count = assignment.assist_count;
         data.share_enabled = assignment.share_enabled;
         (data.local_socks_port, data.machine_id.clone())
@@ -1330,12 +1370,6 @@ async fn start_runtime(app: AppHandle) -> CommandResult {
                 error: None,
             };
         }
-        if data.config.client_secret.is_empty() {
-            return CommandResult {
-                ok: false,
-                error: Some("缺少 CLIENT_SECRET，请配置 runtime-config.json".into()),
-            };
-        }
         data.running = true;
         data.generation += 1;
         data.tunnel_restarts = 0;
@@ -1826,4 +1860,40 @@ fn main() {
         })
         .run(tauri::generate_context!())
         .expect("error while running PortNest");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{device_keypair, generate_device_keypair, machine_id_from_ioreg, valid_machine_id};
+
+    #[test]
+    fn machine_id_matches_dispatcher_rules() {
+        assert!(valid_machine_id("12345678"));
+        assert!(valid_machine_id("device_ID-123"));
+        assert!(valid_machine_id(&"a".repeat(80)));
+        assert!(!valid_machine_id("1234567"));
+        assert!(!valid_machine_id(&"a".repeat(81)));
+        assert!(!valid_machine_id("device.id"));
+        assert!(!valid_machine_id("device id"));
+    }
+
+    #[test]
+    fn extracts_machine_id_from_ioreg_output() {
+        let output = r#"    {
+      "IOPlatformUUID" = "AE85F2DB-0581-5582-A062-B8431D783440"
+    }
+"#;
+        assert_eq!(
+            machine_id_from_ioreg(output),
+            Some("ae85f2db-0581-5582-a062-b8431d783440".into())
+        );
+    }
+
+    #[test]
+    fn generates_and_restores_device_keypair() {
+        let generated = generate_device_keypair();
+        assert_eq!(generated.0.len(), 64);
+        assert_eq!(generated.1.len(), 64);
+        assert_eq!(device_keypair(&generated.0), Some(generated));
+    }
 }
