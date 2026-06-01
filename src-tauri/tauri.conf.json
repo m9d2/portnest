@@ -46,7 +46,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDJCNzAwOEZEQkU3ODMxN0IKUldSN01YaSsvUWh3Sys2ZTBOYURmcU05RVQ1dmlCTDlySnJ5SFhmOE9EaUR0Zy9HbERGbDJzUVoK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEUyQTQzNDc2OUY5NENFQjgKUldTNHpwU2ZkalNrNG9VWUtiUE5DZ3g1NmJ3QXV6NVVzNm01dm5oYXJSMzY2VVpOUHFjcGZTcDcK%",
       "endpoints": [
         "https://github.com/m9d2/portnest/releases/latest/download/latest.json"
       ],
