@@ -35,6 +35,19 @@ function replaceRequired(content, pattern, replacement, file) {
   return content.replace(pattern, replacement);
 }
 
+function writeCargoLockVersion(file, nextVersion) {
+  const cargoLock = fs.readFileSync(file, 'utf8');
+  fs.writeFileSync(
+    file,
+    replaceRequired(
+      cargoLock,
+      /(\[\[package\]\]\r?\nname = "portnest"\r?\nversion = ")[^"]+"/,
+      `$1${nextVersion}"`,
+      file,
+    ),
+  );
+}
+
 function syncVersion(rawVersion, root = path.join(__dirname, '..')) {
   const version = normalizeVersion(rawVersion);
   const packageJsonPath = path.join(root, 'package.json');
@@ -53,16 +66,7 @@ function syncVersion(rawVersion, root = path.join(__dirname, '..')) {
     replaceRequired(cargoToml, /^version = ".+"$/m, `version = "${version}"`, cargoTomlPath),
   );
 
-  const cargoLock = fs.readFileSync(cargoLockPath, 'utf8');
-  fs.writeFileSync(
-    cargoLockPath,
-    replaceRequired(
-      cargoLock,
-      /(\[\[package\]\]\nname = "portnest"\nversion = ")[^"]+"/,
-      `$1${version}"`,
-      cargoLockPath,
-    ),
-  );
+  writeCargoLockVersion(cargoLockPath, version);
 
   return version;
 }

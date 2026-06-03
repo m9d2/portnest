@@ -42,6 +42,18 @@
     ],
     "macOS": {
       "signingIdentity": "-"
+    },
+    "windows": {
+      "nsis": {
+        "installerIcon": "../build/icon.ico",
+        "headerImage": "assets/nsis-header.bmp",
+        "sidebarImage": "assets/nsis-sidebar.bmp",
+        "languages": [
+          "SimpChinese",
+          "English"
+        ],
+        "startMenuFolder": "PortNest"
+      }
     }
   },
   "plugins": {
