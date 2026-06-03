@@ -35,6 +35,9 @@ jobs:
           node-version: 20
           cache: npm
 
+      - name: Sync version from tag
+        run: node scripts/sync-version.js "${{ github.ref_name }}"
+
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}

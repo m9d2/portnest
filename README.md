@@ -52,8 +52,12 @@ The workflow writes `runtime-config.json` during CI from those secrets. Do not c
 Release flow:
 
 ```bash
-npm run release -- 1.0.1
+npm run release -- 1.1.5
 ```
+
+Do not edit version fields manually. The release script updates `package.json`, `package-lock.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` and `src-tauri/Cargo.lock`, commits the changes as `release: v<version>`, creates the matching `v<version>` tag and pushes the commit plus tag.
+
+The GitHub Actions workflow also runs `scripts/sync-version.js` before building, so tag-triggered builds use the tag version even if a future release commit accidentally misses a version file.
 
 macOS builds are ad-hoc signed because the project does not currently use an Apple Developer ID certificate. Gatekeeper may report a downloaded app as damaged. For local testing, remove the quarantine flag after installing:
 
